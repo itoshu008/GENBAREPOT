@@ -55,8 +55,8 @@ setupSocketIO(io);
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   if (process.env.NODE_ENV === "production") {
-    const clientDistPath = path.join(__dirname, "../../../client/dist");
-    console.log(`Serving static files from: ${clientDistPath}`);
+    const clientDistPath = path.join(__dirname, "../../client/dist");
+    console.log(`Serving static files from: ${path.resolve(clientDistPath)}`);
   }
 });
 
