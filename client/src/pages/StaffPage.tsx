@@ -10,8 +10,10 @@ function StaffPage() {
   const [reportDate, setReportDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
+  const [location, setLocation] = useState<string>("");
   const [staffName, setStaffName] = useState<string>("");
   const [reportContent, setReportContent] = useState<string>("");
   const [sites, setSites] = useState<Site[]>([]);
@@ -28,12 +30,35 @@ function StaffPage() {
     loadSites();
   }, [reportDate]);
 
+  // 利用可能な場所のリストを取得
+  const availableLocations = Array.from(
+    new Set(sites.map((s) => s.location).filter((l): l is string => !!l))
+  ).sort((a, b) => a.localeCompare(b, "ja"));
+
+  // 選択された場所でフィルタリングされた現場リスト
+  const filteredSites = selectedLocation
+    ? sites.filter((s) => s.location === selectedLocation)
+    : sites;
+
   useEffect(() => {
     if (selectedSiteId) {
-      const site = sites.find((s) => s.id === selectedSiteId);
+      const site = filteredSites.find((s) => s.id === selectedSiteId);
       setSelectedSite(site || null);
+      // 現場が選択されたら場所を自動入力
+      if (site?.location) {
+        setLocation(site.location);
+      }
+    } else {
+      setSelectedSite(null);
     }
-  }, [selectedSiteId, sites]);
+  }, [selectedSiteId, filteredSites]);
+
+  // 場所が変更されたら現場選択をリセット
+  useEffect(() => {
+    setSelectedSiteId(null);
+    setSelectedSite(null);
+    setLocation(selectedLocation || "");
+  }, [selectedLocation]);
 
   const loadSites = async () => {
     try {
@@ -87,7 +112,12 @@ function StaffPage() {
   const handleSiteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const siteId = parseInt(e.target.value);
     setSelectedSiteId(siteId);
-    setSelectedSite(sites.find((s) => s.id === siteId) || null);
+    const site = filteredSites.find((s) => s.id === siteId);
+    setSelectedSite(site || null);
+    // 現場が選択されたら場所を自動入力
+    if (site?.location) {
+      setLocation(site.location);
+    }
   };
 
   const handleSave = async () => {
@@ -106,6 +136,7 @@ function StaffPage() {
       if (currentReport?.id) {
         // 更新
         await reportsApi.updateReport(currentReport.id, {
+          location: location,
           staff_report_content: reportContent,
           updated_by: staffName,
         });
@@ -117,7 +148,7 @@ function StaffPage() {
           site_id: selectedSiteId,
           site_code: selectedSite.site_code,
           site_name: selectedSite.site_name,
-          location: selectedSite.location,
+          location: location,
           staff_name: staffName,
           report_content: reportContent,
           created_by: staffName,
@@ -129,6 +160,10 @@ function StaffPage() {
           const reportResponse = await reportsApi.getReport(response.data.id);
           if (reportResponse.success) {
             setCurrentReport(reportResponse.data);
+            // 報告書の場所を反映
+            if (reportResponse.data.location) {
+              setLocation(reportResponse.data.location);
+            }
           }
         }
       }
@@ -174,6 +209,39 @@ function StaffPage() {
     }
   };
 
+  // 既存の報告書を読み込む
+  useEffect(() => {
+    const loadExistingReport = async () => {
+      if (!reportDate || !selectedSiteId || !staffName) return;
+      
+      try {
+        const response = await reportsApi.getReports({
+          role: "staff",
+          date_from: reportDate,
+          date_to: reportDate,
+          staff_name: staffName,
+        });
+        if (response.success && response.data.length > 0) {
+          const report = response.data.find(
+            (r) => r.site_id === selectedSiteId
+          );
+          if (report) {
+            setCurrentReport(report);
+            if (report.location) {
+              setLocation(report.location);
+            }
+            if (report.staff_report_content) {
+              setReportContent(report.staff_report_content);
+            }
+          }
+        }
+      } catch (error) {
+        // エラーは無視
+      }
+    };
+    loadExistingReport();
+  }, [reportDate, selectedSiteId, staffName]);
+
   const canEdit = currentReport
     ? currentReport.status === "staff_draft" ||
       currentReport.status === "returned_by_sales"
@@ -187,6 +255,9 @@ function StaffPage() {
         const response = await reportsApi.getReport(currentReport.id);
         if (response.success) {
           setCurrentReport(response.data);
+          if (response.data.location) {
+            setLocation(response.data.location);
+          }
         }
       }
     },
@@ -196,6 +267,9 @@ function StaffPage() {
         const response = await reportsApi.getReport(currentReport.id);
         if (response.success) {
           setCurrentReport(response.data);
+          if (response.data.location) {
+            setLocation(response.data.location);
+          }
         }
       }
     }
@@ -226,17 +300,34 @@ function StaffPage() {
           </div>
 
           <div className="form-group">
+            <label>場所</label>
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              disabled={loading || !canEdit}
+            >
+              <option value="">すべての場所</option>
+              {availableLocations.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
             <label>現場名</label>
             <select
               value={selectedSiteId || ""}
               onChange={handleSiteChange}
-              disabled={loading || !canEdit}
+              disabled={loading || !canEdit || !selectedLocation}
             >
-              <option value="">選択してください</option>
-              {sites.map((site) => (
+              <option value="">
+                {selectedLocation ? "現場を選択してください" : "まず場所を選択してください"}
+              </option>
+              {filteredSites.map((site) => (
                 <option key={site.id} value={site.id}>
                   {site.site_name} ({site.site_code})
-                  {site.location ? ` - ${site.location}` : ""}
                 </option>
               ))}
             </select>
@@ -244,12 +335,13 @@ function StaffPage() {
 
           {selectedSite && (
             <div className="form-group">
-              <label>場所</label>
+              <label>場所（詳細）</label>
               <input
                 type="text"
-                value={selectedSite.location || ""}
-                disabled
-                className="readonly"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                disabled={loading || !canEdit}
+                placeholder="場所の詳細を入力（任意）"
               />
             </div>
           )}
