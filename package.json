@@ -13,7 +13,9 @@
     "dev:client": "cd client && npm run dev",
     "build": "npm run build:server && npm run build:client",
     "build:server": "cd server && npm run build",
-    "build:client": "cd client && npm run build"
+    "build:client": "cd client && npm run build",
+    "start": "cd server && npm run start",
+    "migrate": "cd server && mysql -u genbareport_user -pzatint_6487 genbareport_db < database/migrations/001_initial_schema.sql"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

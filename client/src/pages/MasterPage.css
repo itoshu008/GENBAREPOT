@@ -113,6 +113,66 @@ h2 {
   border: 1px solid #f5c6cb;
 }
 
+.sheets-section {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.sheets-section h2 {
+  font-size: 20px;
+  margin-bottom: 20px;
+}
+
+.sheets-section h3 {
+  font-size: 16px;
+  margin-bottom: 15px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 15px;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+
+.sheets-list {
+  margin-top: 20px;
+}
+
+.sheets-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  margin-top: 15px;
+}
+
+.sheets-table th,
+.sheets-table td {
+  padding: 10px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+.sheets-table th {
+  background-color: #f8f9fa;
+  font-weight: bold;
+}
+
+.url-cell {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
 .sites-section {
   margin-top: 40px;
 }

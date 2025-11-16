@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { masterApi, SiteMaster } from "../services/api";
+import { sheetsApi, Sheet, SheetType } from "../services/sheetsApi";
 import { getSocket } from "../services/socket";
 import "./MasterPage.css";
 
@@ -12,6 +13,13 @@ function MasterPage() {
   const [sites, setSites] = useState<SiteMaster[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
+  
+  // 新しいスプレッドシート管理用の状態
+  const [sheets, setSheets] = useState<Sheet[]>([]);
+  const [newSheetUrl, setNewSheetUrl] = useState<string>("");
+  const [newSheetType, setNewSheetType] = useState<SheetType>("sites");
+  const [newSheetYear, setNewSheetYear] = useState<number>(new Date().getFullYear());
+  const [newSheetMonth, setNewSheetMonth] = useState<number>(new Date().getMonth() + 1);
 
   useEffect(() => {
     // Socket.IOでリアルタイム更新を受信
@@ -31,7 +39,74 @@ function MasterPage() {
 
   useEffect(() => {
     loadSites();
+    loadSheets();
   }, [year, month]);
+
+  const loadSheets = async () => {
+    try {
+      const response = await sheetsApi.getSheets({
+        target_year: year,
+        target_month: month,
+      });
+      if (response.success) {
+        setSheets(response.data);
+      }
+    } catch (error) {
+      console.error("Error loading sheets:", error);
+    }
+  };
+
+  const handleRegisterSheet = async () => {
+    if (!newSheetUrl) {
+      setMessage({ type: "error", text: "URLを入力してください" });
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      await sheetsApi.createSheet({
+        url: newSheetUrl,
+        type: newSheetType,
+        target_year: newSheetYear,
+        target_month: newSheetMonth,
+        is_active: true,
+      });
+      setMessage({ type: "success", text: "URLを登録しました" });
+      setNewSheetUrl("");
+      loadSheets();
+    } catch (error: any) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || "登録に失敗しました",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSyncSheet = async (sheetId: number) => {
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const response = await sheetsApi.syncSheet(sheetId);
+      setMessage({
+        type: "success",
+        text: `${response.data.count}件のデータを同期しました`,
+      });
+      loadSheets();
+      loadSites();
+    } catch (error: any) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || "同期に失敗しました",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadSites = async () => {
     try {
@@ -191,6 +266,107 @@ function MasterPage() {
           )}
         </div>
 
+        <div className="sheets-section">
+          <h2>スプレッドシートURL管理 ({year}年{month}月)</h2>
+          
+          <div className="form-section">
+            <h3>新規URL登録</h3>
+            <div className="form-row">
+              <div className="form-group">
+                <label>URL</label>
+                <input
+                  type="text"
+                  value={newSheetUrl}
+                  onChange={(e) => setNewSheetUrl(e.target.value)}
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                  disabled={loading}
+                />
+              </div>
+              <div className="form-group">
+                <label>種別</label>
+                <select
+                  value={newSheetType}
+                  onChange={(e) => setNewSheetType(e.target.value as SheetType)}
+                  disabled={loading}
+                >
+                  <option value="sites">現場マスタ</option>
+                  <option value="staffs">スタッフマスタ</option>
+                  <option value="other">その他</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>対象年</label>
+                <input
+                  type="number"
+                  value={newSheetYear}
+                  onChange={(e) => setNewSheetYear(Number(e.target.value))}
+                  disabled={loading}
+                />
+              </div>
+              <div className="form-group">
+                <label>対象月</label>
+                <input
+                  type="number"
+                  value={newSheetMonth}
+                  onChange={(e) => setNewSheetMonth(Number(e.target.value))}
+                  min="1"
+                  max="12"
+                  disabled={loading}
+                />
+              </div>
+              <button
+                onClick={handleRegisterSheet}
+                disabled={loading}
+                className="btn btn-primary"
+              >
+                登録
+              </button>
+            </div>
+          </div>
+
+          <div className="sheets-list">
+            <h3>登録済みURL一覧</h3>
+            {sheets.length === 0 ? (
+              <p className="empty-message">登録されていません</p>
+            ) : (
+              <table className="sheets-table">
+                <thead>
+                  <tr>
+                    <th>種別</th>
+                    <th>URL</th>
+                    <th>最終同期</th>
+                    <th>状態</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sheets.map((sheet) => (
+                    <tr key={sheet.id}>
+                      <td>{sheet.type}</td>
+                      <td className="url-cell">{sheet.url}</td>
+                      <td>
+                        {sheet.last_synced_at
+                          ? new Date(sheet.last_synced_at).toLocaleString("ja-JP")
+                          : "未同期"}
+                      </td>
+                      <td>{sheet.is_active ? "有効" : "無効"}</td>
+                      <td>
+                        <button
+                          onClick={() => handleSyncSheet(sheet.id!)}
+                          disabled={loading}
+                          className="btn btn-small btn-secondary"
+                        >
+                          今すぐ同期
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
         <div className="sites-section">
           <h2>サイトマスタ一覧 ({year}年{month}月)</h2>
           {sites.length === 0 ? (
@@ -201,6 +377,7 @@ function MasterPage() {
                 <tr>
                   <th>サイトコード</th>
                   <th>サイト名</th>
+                  <th>場所</th>
                 </tr>
               </thead>
               <tbody>
@@ -208,6 +385,7 @@ function MasterPage() {
                   <tr key={site.id}>
                     <td>{site.site_code}</td>
                     <td>{site.site_name}</td>
+                    <td>{(site as any).location || "-"}</td>
                   </tr>
                 ))}
               </tbody>
