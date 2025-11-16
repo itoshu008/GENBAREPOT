@@ -117,3 +117,38 @@ export async function determineSheetName(
   return sheetNames[0];
 }
 
+/**
+ * スプレッドシートの最終更新日時を取得
+ * 注意: Google Sheets APIでは直接取得できないため、Drive APIを使用
+ */
+export async function getSheetModifiedTime(spreadsheetId: string): Promise<Date | null> {
+  try {
+    const auth = await getAuth();
+    
+    // サービスアカウントの場合のみDrive APIを使用
+    if (typeof auth !== "string") {
+      const drive = google.drive({ 
+        version: "v3", 
+        auth: auth,
+      });
+
+      const response = await drive.files.get({
+        fileId: spreadsheetId,
+        fields: "modifiedTime",
+      });
+      
+      if (response.data.modifiedTime) {
+        return new Date(response.data.modifiedTime);
+      }
+    }
+    
+    // APIキーの場合や取得に失敗した場合はnullを返す
+    // （変更検知できない場合は同期を実行する）
+    return null;
+  } catch (error) {
+    console.warn("Error getting sheet modified time:", error);
+    // エラーが発生した場合はnullを返す（変更検知できない場合は同期を実行）
+    return null;
+  }
+}
+

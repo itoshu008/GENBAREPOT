@@ -7,6 +7,7 @@ import path from "path";
 import { initDatabase } from "./database/connection";
 import { setupRoutes } from "./routes";
 import { setupSocketIO } from "./socket";
+import { startAutoSync } from "./services/autoSync";
 
 dotenv.config();
 
@@ -52,11 +53,42 @@ if (process.env.NODE_ENV === "production") {
 // Socket.IO設定
 setupSocketIO(io);
 
+// 自動同期サービスを開始
+// AUTO_SYNC_INTERVAL_MINUTES 環境変数で同期間隔を設定（デフォルト: 60分）
+const autoSyncInterval = process.env.AUTO_SYNC_INTERVAL_MINUTES
+  ? parseInt(process.env.AUTO_SYNC_INTERVAL_MINUTES, 10)
+  : 60;
+
+// AUTO_SYNC_ENABLED が false の場合は自動同期を無効化
+const autoSyncEnabled = process.env.AUTO_SYNC_ENABLED !== "false";
+
+let autoSyncIntervalId: NodeJS.Timeout | null = null;
+
+if (autoSyncEnabled) {
+  autoSyncIntervalId = startAutoSync(io, autoSyncInterval);
+  console.log(`Auto sync enabled: ${autoSyncInterval} minutes interval`);
+} else {
+  console.log("Auto sync disabled (AUTO_SYNC_ENABLED=false)");
+}
+
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   if (process.env.NODE_ENV === "production") {
     const clientDistPath = path.join(__dirname, "../../client/dist");
     console.log(`Serving static files from: ${path.resolve(clientDistPath)}`);
   }
+});
+
+// グレースフルシャットダウン
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, shutting down gracefully...");
+  if (autoSyncIntervalId) {
+    const { stopAutoSync } = require("./services/autoSync");
+    stopAutoSync(autoSyncIntervalId);
+  }
+  httpServer.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
 });
 

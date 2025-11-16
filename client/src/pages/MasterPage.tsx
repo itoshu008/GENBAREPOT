@@ -16,13 +16,11 @@ interface SheetFormData {
 }
 
 function MasterPage() {
-  const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [sites, setSites] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
-  const [availableMonths, setAvailableMonths] = useState<number[]>([]);
+  const [showSites, setShowSites] = useState<boolean>(false); // 現場マスタの表示/非表示
   
   // 新規シート登録フォーム（複数追加可能）
   const [newSheetForms, setNewSheetForms] = useState<SheetFormData[]>([
@@ -53,42 +51,11 @@ function MasterPage() {
   useEffect(() => {
     loadSheets();
     loadSites();
-  }, [year, month]);
-
-  // 利用可能な月のリストを取得
-  useEffect(() => {
-    const loadAvailableMonths = async () => {
-      try {
-        const response = await sheetsApi.getSheets({ target_year: year });
-        if (response.success) {
-          const monthsSet = new Set<number>();
-          response.data.forEach((sheet) => {
-            if (sheet.target_year === year) {
-              monthsSet.add(sheet.target_month);
-            }
-          });
-          const sortedMonths = Array.from(monthsSet).sort((a, b) => a - b);
-          const allMonths = Array.from({ length: 12 }, (_, i) => i + 1);
-          setAvailableMonths(sortedMonths.length > 0 ? sortedMonths : allMonths);
-        } else {
-          const allMonths = Array.from({ length: 12 }, (_, i) => i + 1);
-          setAvailableMonths(allMonths);
-        }
-      } catch (error) {
-        console.error("Error loading available months:", error);
-        const allMonths = Array.from({ length: 12 }, (_, i) => i + 1);
-        setAvailableMonths(allMonths);
-      }
-    };
-    loadAvailableMonths();
-  }, [year]);
+  }, []);
 
   const loadSheets = async () => {
     try {
-      const response = await sheetsApi.getSheets({
-        target_year: year,
-        target_month: month,
-      });
+      const response = await sheetsApi.getSheets({});
       if (response.success) {
         setSheets(response.data);
       }
@@ -99,7 +66,7 @@ function MasterPage() {
 
   const loadSites = async () => {
     try {
-      const response = await mastersApi.getSites({ year, month });
+      const response = await mastersApi.getSites({});
       if (response.success) {
         setSites(response.data);
       }
@@ -192,6 +159,10 @@ function MasterPage() {
   };
 
   const handleSyncSheet = async (sheetId: number) => {
+    if (!confirm("スプレッドシートを再同期しますか？\n既存の現場データが更新されますが、報告書データは影響を受けません。")) {
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
 
@@ -235,59 +206,14 @@ function MasterPage() {
     }
   };
 
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-
   return (
     <div className="master-page">
       <div className="container">
         <h1>現場報告アプリ - マスター管理</h1>
 
-        <div className="form-section">
-          <h2>年月選択</h2>
-          <div className="form-row">
-            <div className="form-group">
-              <label>年</label>
-              <select
-                value={year}
-                onChange={(e) => setYear(Number(e.target.value))}
-                disabled={loading}
-              >
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>月</label>
-              <select
-                value={month}
-                onChange={(e) => setMonth(Number(e.target.value))}
-                disabled={loading}
-              >
-                {availableMonths.length > 0 ? (
-                  availableMonths.map((m) => (
-                    <option key={m} value={m}>
-                      {m}月
-                    </option>
-                  ))
-                ) : (
-                  months.map((m) => (
-                    <option key={m} value={m}>
-                      {m}月
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-          </div>
-        </div>
-
         <div className="sheets-section">
           <div className="section-header">
-            <h2>スプレッドシート登録 ({year}年{month}月)</h2>
+            <h2>スプレッドシート登録</h2>
             <button
               onClick={handleAddSheetForm}
               className="btn btn-primary btn-add"
@@ -426,7 +352,7 @@ function MasterPage() {
         </div>
 
         <div className="sheets-list-section">
-          <h2>登録済みスプレッドシート一覧 ({year}年{month}月)</h2>
+          <h2>登録済みスプレッドシート一覧</h2>
           {sheets.length === 0 ? (
             <p className="empty-message">登録されていません</p>
           ) : (
@@ -487,8 +413,62 @@ function MasterPage() {
         </div>
 
         <div className="sites-section">
-          <h2>現場マスタ一覧 ({year}年{month}月)</h2>
-          {sites.length === 0 ? (
+          <div className="section-header">
+            <h2>現場マスタ一覧</h2>
+            <div className="button-group-inline">
+              <button
+                onClick={() => setShowSites(!showSites)}
+                className="btn btn-secondary"
+                disabled={loading}
+              >
+                {showSites ? "非表示" : "表示"}
+              </button>
+              {sheets.length > 0 && (
+                <button
+                  onClick={async () => {
+                    if (!confirm("すべてのスプレッドシートを再同期しますか？\n既存の現場データが更新されますが、報告書データは影響を受けません。")) {
+                      return;
+                    }
+                    setLoading(true);
+                    setMessage(null);
+                    try {
+                      let totalCount = 0;
+                      for (const sheet of sheets) {
+                        if (sheet.id) {
+                          try {
+                            const response = await sheetsApi.syncSheet(sheet.id);
+                            totalCount += response.data.count || 0;
+                          } catch (error) {
+                            console.error(`Error syncing sheet ${sheet.id}:`, error);
+                          }
+                        }
+                      }
+                      setMessage({
+                        type: "success",
+                        text: `合計${totalCount}件のデータを同期しました`,
+                      });
+                      loadSheets();
+                      loadSites();
+                    } catch (error: any) {
+                      setMessage({
+                        type: "error",
+                        text: error.response?.data?.error || "同期に失敗しました",
+                      });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                  className="btn btn-secondary"
+                >
+                  すべて再同期
+                </button>
+              )}
+            </div>
+          </div>
+          {!showSites ? (
+            <p className="empty-message">表示ボタンをクリックして現場マスタを表示</p>
+          ) : sites.length === 0 ? (
             <p className="empty-message">データがありません</p>
           ) : (
             <table className="sites-table">
@@ -505,20 +485,45 @@ function MasterPage() {
                   let dateDisplay = "-";
                   if (site.date) {
                     try {
-                      // 日付文字列をパース（YYYY-MM-DD形式を想定）
-                      const dateStr = site.date.toString();
-                      if (dateStr.includes("-")) {
-                        const [year, month, day] = dateStr.split("-");
-                        dateDisplay = `${year}年${parseInt(month)}月${parseInt(day)}日`;
+                      // 日付文字列をパース
+                      let dateStr = site.date.toString();
+                      
+                      // デバッグ用ログ（本番では削除可能）
+                      console.log("Original date value:", site.date, "Type:", typeof site.date, "String:", dateStr);
+                      
+                      // ISO形式（2025-11-01T00:00:00.000Zなど）の場合
+                      if (dateStr.includes("T")) {
+                        dateStr = dateStr.split("T")[0];
+                      }
+                      // 時刻部分を削除（2025-11-01 00:00:00など）
+                      if (dateStr.includes(" ")) {
+                        dateStr = dateStr.split(" ")[0];
+                      }
+                      
+                      // ハイフン区切り（YYYY-MM-DD形式）をチェック
+                      const dateMatch = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+                      if (dateMatch) {
+                        const [, year, month, day] = dateMatch;
+                        const monthNum = parseInt(month, 10);
+                        const dayNum = parseInt(day, 10);
+                        dateDisplay = `${year}年${monthNum}月${dayNum}日`;
                       } else if (dateStr.includes("/")) {
-                        // YYYY/MM/DD形式の場合
-                        const [year, month, day] = dateStr.split("/");
-                        dateDisplay = `${year}年${parseInt(month)}月${parseInt(day)}日`;
+                        // スラッシュ区切り（YYYY/MM/DD形式）
+                        const parts = dateStr.split("/");
+                        if (parts.length >= 3) {
+                          const year = parts[0];
+                          const month = parts[1].replace(/^0+/, "") || parts[1];
+                          const day = parts[2].replace(/^0+/, "") || parts[2];
+                          dateDisplay = `${year}年${parseInt(month)}月${parseInt(day)}日`;
+                        }
                       } else {
                         // Dateオブジェクトとしてパースを試みる
                         const dateObj = new Date(dateStr);
                         if (!isNaN(dateObj.getTime())) {
                           dateDisplay = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+                        } else {
+                          console.warn("Could not parse date:", dateStr);
+                          dateDisplay = dateStr;
                         }
                       }
                     } catch (error) {

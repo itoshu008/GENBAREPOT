@@ -203,10 +203,9 @@ export async function syncSheetDataWithCoordinates(sheet: Sheet): Promise<{ coun
       }
 
       // 既存データ削除（同じ年月）
-      await connection.execute(
-        "DELETE FROM sites WHERE year = ? AND month = ?",
-        [sheet.target_year, sheet.target_month]
-      );
+      // 注意: reportsテーブルとの外部キー制約があるため、報告書が存在するsitesは削除できない
+      // そのため、既存のsitesを更新する方式に変更（ON DUPLICATE KEY UPDATEを使用）
+      // DELETEは行わず、INSERT ... ON DUPLICATE KEY UPDATEで更新のみ行う
 
       // 新規データ挿入
       for (const row of dataRows) {
@@ -221,14 +220,42 @@ export async function syncSheetDataWithCoordinates(sheet: Sheet): Promise<{ coun
           continue;
         }
 
-        // 日付から年月を抽出（YYYY-MM-DD形式を想定）
-        let reportDate: string = dateValue;
-        if (dateValue.includes("/")) {
+        // 日付をYYYY-MM-DD形式に変換
+        let reportDate: string | null = null;
+        
+        // 日本語形式（YYYY年MM月DD日）を処理
+        const japaneseDateMatch = dateValue.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+        if (japaneseDateMatch) {
+          const [, year, month, day] = japaneseDateMatch;
+          reportDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+        } else if (dateValue.includes("/")) {
           // YYYY/MM/DD形式の場合
           const parts = dateValue.split("/");
           if (parts.length === 3) {
             reportDate = `${parts[0]}-${parts[1].padStart(2, "0")}-${parts[2].padStart(2, "0")}`;
           }
+        } else if (dateValue.includes("-")) {
+          // 既にYYYY-MM-DD形式の場合
+          reportDate = dateValue;
+        } else {
+          // その他の形式を試す（Dateオブジェクトでパース）
+          try {
+            const parsedDate = new Date(dateValue);
+            if (!isNaN(parsedDate.getTime())) {
+              const year = parsedDate.getFullYear();
+              const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+              const day = String(parsedDate.getDate()).padStart(2, "0");
+              reportDate = `${year}-${month}-${day}`;
+            }
+          } catch (error) {
+            console.warn(`Failed to parse date: ${dateValue}`, error);
+          }
+        }
+        
+        // 日付が変換できなかった場合はスキップ
+        if (!reportDate) {
+          console.warn(`Skipping row with invalid date format: ${dateValue}`);
+          continue;
         }
 
         // サイトコードを生成（現場名から、または日付+現場名のハッシュ）
