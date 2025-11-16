@@ -43,7 +43,7 @@ async function fetchCSVFromSheet(url: string): Promise<string[][]> {
     for (const line of lines) {
       if (line.trim()) {
         // カンマ区切りで分割（簡易実装、引用符対応は省略）
-        const cells = line.split(",").map((cell) => cell.trim());
+        const cells = line.split(",").map((cell: string) => cell.trim());
         rows.push(cells);
       }
     }
