@@ -160,6 +160,7 @@ export default function reportRoutes(io: Server) {
         site_name,
         location,
         staff_name,
+        staff_roles,
         report_content,
         created_by,
       } = req.body;
@@ -178,14 +179,15 @@ export default function reportRoutes(io: Server) {
         const [result] = await connection.execute(
           `INSERT INTO reports (
             report_date, site_id, site_code, site_name, location,
-            staff_report_content, status, created_by
-          ) VALUES (?, ?, ?, ?, ?, ?, 'staff_draft', ?)`,
+            staff_roles, staff_report_content, status, created_by
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'staff_draft', ?)`,
           [
             report_date,
             site_id,
             site_code,
             site_name,
             location || null,
+            staff_roles || null,
             report_content || null,
             created_by || staff_name || null,
           ]
@@ -239,6 +241,7 @@ export default function reportRoutes(io: Server) {
         "site_name",
         "location",
         "chief_name",
+        "staff_roles",
         "staff_report_content",
         "chief_report_content",
         "sales_comment",

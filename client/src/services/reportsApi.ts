@@ -20,6 +20,7 @@ export interface Report {
   chief_name?: string;
   status: ReportStatus;
   staff_name?: string;
+  staff_roles?: string;
   report_content?: string;
   staff_report_content?: string;
   chief_report_content?: string;

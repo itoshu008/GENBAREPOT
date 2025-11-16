@@ -15,6 +15,19 @@ function StaffPage() {
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
   const [location, setLocation] = useState<string>("");
   const [staffName, setStaffName] = useState<string>("");
+  const [staffRoles, setStaffRoles] = useState<{
+    ad: boolean;
+    pa: boolean;
+    staff: boolean;
+    actor: boolean;
+    attend: boolean;
+  }>({
+    ad: false,
+    pa: false,
+    staff: false,
+    actor: false,
+    attend: false,
+  });
   const [reportContent, setReportContent] = useState<string>("");
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -53,12 +66,31 @@ function StaffPage() {
     }
   }, [selectedSiteId, filteredSites]);
 
-  // 場所が変更されたら現場選択をリセット
+  // 場所が変更されたら現場選択をリセット、または自動選択
   useEffect(() => {
-    setSelectedSiteId(null);
-    setSelectedSite(null);
-    setLocation(selectedLocation || "");
-  }, [selectedLocation]);
+    if (selectedLocation) {
+      const filtered = sites.filter((s) => s.location === selectedLocation);
+      // 該当する現場が1つだけなら自動選択
+      if (filtered.length === 1) {
+        const site = filtered[0];
+        setSelectedSiteId(site.id || null);
+        setSelectedSite(site);
+        if (site.location) {
+          setLocation(site.location);
+        }
+      } else {
+        // 複数または0件の場合はリセット
+        setSelectedSiteId(null);
+        setSelectedSite(null);
+        setLocation(selectedLocation);
+      }
+    } else {
+      // 場所が未選択の場合はリセット
+      setSelectedSiteId(null);
+      setSelectedSite(null);
+      setLocation("");
+    }
+  }, [selectedLocation, sites]);
 
   const loadSites = async () => {
     try {
@@ -233,6 +265,17 @@ function StaffPage() {
             if (report.staff_report_content) {
               setReportContent(report.staff_report_content);
             }
+            // 役割を反映
+            if (report.staff_roles) {
+              const roles = report.staff_roles.split(",");
+              setStaffRoles({
+                ad: roles.includes("AD"),
+                pa: roles.includes("PA"),
+                staff: roles.includes("スタッフ"),
+                actor: roles.includes("アクター"),
+                attend: roles.includes("アテンド"),
+              });
+            }
           }
         }
       } catch (error) {
@@ -355,6 +398,67 @@ function StaffPage() {
               disabled={loading || !canEdit}
               placeholder="あなたの名前を入力"
             />
+          </div>
+
+          <div className="form-group">
+            <label>役割</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={staffRoles.ad}
+                  onChange={(e) =>
+                    setStaffRoles({ ...staffRoles, ad: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                AD
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={staffRoles.pa}
+                  onChange={(e) =>
+                    setStaffRoles({ ...staffRoles, pa: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                PA
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={staffRoles.staff}
+                  onChange={(e) =>
+                    setStaffRoles({ ...staffRoles, staff: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                スタッフ
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={staffRoles.actor}
+                  onChange={(e) =>
+                    setStaffRoles({ ...staffRoles, actor: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                アクター
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={staffRoles.attend}
+                  onChange={(e) =>
+                    setStaffRoles({ ...staffRoles, attend: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                アテンド
+              </label>
+            </div>
           </div>
 
           <div className="form-group">
