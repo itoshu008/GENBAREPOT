@@ -43,6 +43,7 @@ async function fetchSheetData(url: string, dateCol: string, siteNameCol: string,
   if (hasGoogleSheetsKey) {
     try {
       // Google Sheets APIを使用（非公開シートにもアクセス可能）
+      // サービスアカウントで認証するため、zatgenba@gmail.comで共有されているスプレッドシートにもアクセス可能
       const sheetName = await determineSheetName(spreadsheetId, null);
       
       // 最大列を計算
@@ -112,7 +113,11 @@ async function fetchSheetData(url: string, dateCol: string, siteNameCol: string,
     return rows;
   } catch (error: any) {
     console.error("Error fetching CSV:", error);
-    throw new Error(`Failed to fetch sheet data: ${error.message}`);
+    // エラーメッセージをそのまま伝播
+    if (error.message) {
+      throw error;
+    }
+    throw new Error(`Failed to fetch sheet data: ${error.message || "Unknown error"}`);
   }
 }
 

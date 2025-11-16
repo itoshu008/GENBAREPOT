@@ -58,6 +58,8 @@ GOOGLE_SHEETS_KEY_FILE=/home/itoshu3/apps/genbareport_app/genbareport/server/key
 
 サービスアカウントにスプレッドシートへのアクセス権限を付与する必要があります。
 
+### 方法1: サービスアカウントに直接共有（推奨）
+
 1. スプレッドシートを開く
 2. 「共有」ボタンをクリック
 3. サービスアカウントのメールアドレスを入力
@@ -66,6 +68,15 @@ GOOGLE_SHEETS_KEY_FILE=/home/itoshu3/apps/genbareport_app/genbareport/server/key
 5. 「送信」をクリック
 
 **重要**: スプレッドシートを「リンクを知っている全員」に公開する必要はありません。サービスアカウントに直接共有すれば、非公開のままでもアクセスできます。
+
+### 方法2: zatgenba@gmail.comで共有されているスプレッドシートの場合
+
+もしスプレッドシートが既に `zatgenba@gmail.com` で共有されている場合でも、**サーバー側からのCSVエクスポートURLへのアクセスは認証情報がないため失敗します**。
+
+解決策：
+- **サービスアカウントを作成し、そのサービスアカウントにもスプレッドシートを共有してください**
+- サービスアカウントは `zatgenba@gmail.com` とは別のアカウントですが、同じスプレッドシートにアクセスできます
+- サービスアカウントのメールアドレス（例: `genbareport-service@xxxxx.iam.gserviceaccount.com`）をスプレッドシートの共有リストに追加してください
 
 ## 4. 動作確認
 
