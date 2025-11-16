@@ -114,6 +114,18 @@ pm2 restart genbareport --update-env
 
 詳細なデプロイ手順は [DEPLOYMENT.md](./DEPLOYMENT.md) を参照してください。
 
+## ドキュメント
+
+各種ドキュメントは `docs/` ディレクトリに格納されています：
+
+- **API仕様**: [docs/API_ENDPOINTS.md](./docs/API_ENDPOINTS.md)
+- **トラブルシューティング**: [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)
+- **本番環境URL**: [docs/PRODUCTION_URL.md](./docs/PRODUCTION_URL.md)
+- **エラーチェック結果**: [docs/ERROR_CHECK_SUMMARY.md](./docs/ERROR_CHECK_SUMMARY.md)
+- **プロジェクト構造**: [docs/PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md)
+
+詳細は [docs/README.md](./docs/README.md) を参照してください。
+
 ### リアルタイム更新機能
 
 このアプリは Socket.IO を使用してリアルタイム更新を実現しています：
