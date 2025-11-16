@@ -31,17 +31,30 @@ export default function masterRoutes(io: Server) {
 
       const defaultRange = range_a1 || "A2:G500";
 
-      const [result] = await pool.execute(
-        `INSERT INTO sheet_settings (year, month, sheet_url, sheet_id, sheet_name, range_a1)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           sheet_url = VALUES(sheet_url),
-           sheet_id = VALUES(sheet_id),
-           sheet_name = VALUES(sheet_name),
-           range_a1 = VALUES(range_a1),
-           updated_at = CURRENT_TIMESTAMP`,
-        [year, month, sheet_url, sheet_id, sheet_name || null, defaultRange]
-      );
+      // sheet_settingsテーブルは存在しないため、sheetsテーブルを使用
+      // 既存のレコードを確認
+      const [existing] = await pool.execute(
+        "SELECT id FROM sheets WHERE type = 'sites' AND target_year = ? AND target_month = ?",
+        [year, month]
+      ) as any[];
+
+      let result;
+      if (existing.length > 0) {
+        const [updateResult] = await pool.execute(
+          `UPDATE sheets 
+           SET url = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [sheet_url, existing[0].id]
+        ) as any[];
+        result = { insertId: existing[0].id, affectedRows: updateResult.affectedRows };
+      } else {
+        const [insertResult] = await pool.execute(
+          `INSERT INTO sheets (url, type, target_year, target_month, is_active)
+           VALUES (?, 'sites', ?, ?, TRUE)`,
+          [sheet_url, year, month]
+        ) as any[];
+        result = insertResult;
+      }
 
       res.json({
         success: true,
@@ -65,9 +78,9 @@ export default function masterRoutes(io: Server) {
         });
       }
 
-      // シート設定を取得
+      // シート設定を取得（sheetsテーブルから）
       const [settings] = await pool.execute(
-        "SELECT * FROM sheet_settings WHERE year = ? AND month = ?",
+        "SELECT * FROM sheets WHERE type = 'sites' AND target_year = ? AND target_month = ?",
         [year, month]
       ) as any[];
 
@@ -78,7 +91,8 @@ export default function masterRoutes(io: Server) {
       }
 
       const setting = settings[0];
-      const spreadsheetId = setting.sheet_id;
+      // URLからsheet_idを抽出
+      const spreadsheetId = extractSheetId(setting.url);
 
       if (!spreadsheetId) {
         return res.status(400).json({
@@ -89,11 +103,11 @@ export default function masterRoutes(io: Server) {
       // シート名を決定
       const sheetName = await determineSheetName(
         spreadsheetId,
-        setting.sheet_name
+        null
       );
 
       // 範囲を決定
-      const range = setting.range_a1 || "A2:G500";
+      const range = "A2:G500";
       const fullRange = `${sheetName}!${range}`;
 
       // Google Sheetsからデータを取得
@@ -112,31 +126,32 @@ export default function masterRoutes(io: Server) {
       try {
         // 既存のデータを削除
         await connection.execute(
-          "DELETE FROM site_master WHERE year = ? AND month = ?",
+          "DELETE FROM sites WHERE year = ? AND month = ?",
           [year, month]
         );
 
         // 新しいデータを挿入
-        // シートの形式: [site_code, site_name, ...]
+        // シートの形式: [site_code, site_name, location, ...]
         const insertPromises = values.map((row) => {
           const siteCode = row[0]?.toString().trim() || "";
           const siteName = row[1]?.toString().trim() || "";
+          const location = row[2]?.toString().trim() || null;
 
           if (!siteCode || !siteName) {
             return null;
           }
 
           return connection.execute(
-            "INSERT INTO site_master (year, month, site_code, site_name) VALUES (?, ?, ?, ?)",
-            [year, month, siteCode, siteName]
+            "INSERT INTO sites (year, month, site_code, site_name, location) VALUES (?, ?, ?, ?, ?)",
+            [year, month, siteCode, siteName, location]
           );
         });
 
         await Promise.all(insertPromises.filter((p) => p !== null));
 
-        // 最終インポート時刻を更新
+        // 最終インポート時刻を更新（sheetsテーブル）
         await connection.execute(
-          "UPDATE sheet_settings SET last_imported_at = CURRENT_TIMESTAMP WHERE year = ? AND month = ?",
+          "UPDATE sheets SET last_synced_at = CURRENT_TIMESTAMP WHERE type = 'sites' AND target_year = ? AND target_month = ?",
           [year, month]
         );
 
@@ -162,20 +177,20 @@ export default function masterRoutes(io: Server) {
     }
   });
 
-  // シート設定を取得
+  // シート設定を取得（sheetsテーブルから）
   router.get("/sheet-settings", async (req, res) => {
     try {
       const { year, month } = req.query;
 
-      let query = "SELECT * FROM sheet_settings";
+      let query = "SELECT * FROM sheets WHERE type = 'sites'";
       const params: any[] = [];
 
       if (year && month) {
-        query += " WHERE year = ? AND month = ?";
+        query += " AND target_year = ? AND target_month = ?";
         params.push(year, month);
       }
 
-      query += " ORDER BY year DESC, month DESC";
+      query += " ORDER BY target_year DESC, target_month DESC";
 
       const [rows] = await pool.execute(query, params);
 
@@ -198,7 +213,7 @@ export default function masterRoutes(io: Server) {
       }
 
       const [rows] = await pool.execute(
-        "SELECT * FROM site_master WHERE year = ? AND month = ? ORDER BY site_code",
+        "SELECT * FROM sites WHERE year = ? AND month = ? ORDER BY site_code",
         [year, month]
       );
 

@@ -20,6 +20,8 @@ export const sheetsApi = {
     type?: SheetType;
     year?: number;
     month?: number;
+    target_year?: number;
+    target_month?: number;
     is_active?: boolean;
   }) => {
     const response = await api.get("/api/sheets", { params });
