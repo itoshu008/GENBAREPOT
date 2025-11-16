@@ -9,6 +9,11 @@ export interface Sheet {
   target_year: number;
   target_month: number;
   is_active: boolean;
+  date_column?: string | null; // 日付の列（例: "A"）
+  site_name_column?: string | null; // 現場名の列（例: "B"）
+  location_column?: string | null; // 場所の列（例: "C"）
+  staff_column?: string | null; // 担当者の列（例: "D"）
+  start_row?: number | null; // 開始行（例: 2）
   last_synced_at?: string;
   created_at?: string;
   updated_at?: string;

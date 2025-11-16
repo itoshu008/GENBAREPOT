@@ -206,6 +206,89 @@ h2 {
   background-color: #f8f9fa;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.btn-add {
+  font-size: 18px;
+  padding: 10px 20px;
+}
+
+.sheet-form-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.form-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.coordinates-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.coordinates-info span {
+  padding: 2px 6px;
+  background-color: #f0f0f0;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.text-muted {
+  color: #999;
+  font-style: italic;
+}
+
+.button-group-inline {
+  display: flex;
+  gap: 8px;
+}
+
+.sheets-list-section {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 20px;
@@ -217,6 +300,16 @@ h2 {
 
   .btn {
     width: 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
 }
 
