@@ -75,20 +75,15 @@ function StaffPage() {
         const site = filtered[0];
         setSelectedSiteId(site.id || null);
         setSelectedSite(site);
-        if (site.location) {
-          setLocation(site.location);
-        }
       } else {
         // 複数または0件の場合はリセット
         setSelectedSiteId(null);
         setSelectedSite(null);
-        setLocation(selectedLocation);
       }
     } else {
       // 場所が未選択の場合はリセット
       setSelectedSiteId(null);
       setSelectedSite(null);
-      setLocation("");
     }
   }, [selectedLocation, sites]);
 
@@ -146,10 +141,6 @@ function StaffPage() {
     setSelectedSiteId(siteId);
     const site = filteredSites.find((s) => s.id === siteId);
     setSelectedSite(site || null);
-    // 現場が選択されたら場所を自動入力
-    if (site?.location) {
-      setLocation(site.location);
-    }
   };
 
   const handleSave = async () => {
@@ -164,12 +155,22 @@ function StaffPage() {
     setLoading(true);
     setMessage(null);
 
+    // 役割を文字列に変換（カンマ区切り）
+    const rolesArray: string[] = [];
+    if (staffRoles.ad) rolesArray.push("AD");
+    if (staffRoles.pa) rolesArray.push("PA");
+    if (staffRoles.staff) rolesArray.push("スタッフ");
+    if (staffRoles.actor) rolesArray.push("アクター");
+    if (staffRoles.attend) rolesArray.push("アテンド");
+    const staffRoleString = rolesArray.join(",");
+
     try {
       if (currentReport?.id) {
         // 更新
         await reportsApi.updateReport(currentReport.id, {
-          location: location,
+          location: selectedSite?.location || null,
           staff_report_content: reportContent,
+          staff_roles: staffRoleString,
           updated_by: staffName,
         });
         setMessage({ type: "success", text: "保存しました" });
@@ -180,8 +181,9 @@ function StaffPage() {
           site_id: selectedSiteId,
           site_code: selectedSite.site_code,
           site_name: selectedSite.site_name,
-          location: location,
+          location: selectedSite.location || null,
           staff_name: staffName,
+          staff_roles: staffRoleString,
           report_content: reportContent,
           created_by: staffName,
           status: "staff_draft",
@@ -259,9 +261,6 @@ function StaffPage() {
           );
           if (report) {
             setCurrentReport(report);
-            if (report.location) {
-              setLocation(report.location);
-            }
             if (report.staff_report_content) {
               setReportContent(report.staff_report_content);
             }
@@ -298,9 +297,6 @@ function StaffPage() {
         const response = await reportsApi.getReport(currentReport.id);
         if (response.success) {
           setCurrentReport(response.data);
-          if (response.data.location) {
-            setLocation(response.data.location);
-          }
         }
       }
     },
@@ -310,9 +306,6 @@ function StaffPage() {
         const response = await reportsApi.getReport(currentReport.id);
         if (response.success) {
           setCurrentReport(response.data);
-          if (response.data.location) {
-            setLocation(response.data.location);
-          }
         }
       }
     }
@@ -375,19 +368,6 @@ function StaffPage() {
               ))}
             </select>
           </div>
-
-          {selectedSite && (
-            <div className="form-group">
-              <label>場所（詳細）</label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                disabled={loading || !canEdit}
-                placeholder="場所の詳細を入力（任意）"
-              />
-            </div>
-          )}
 
           <div className="form-group">
             <label>スタッフ名</label>

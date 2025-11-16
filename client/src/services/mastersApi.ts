@@ -7,6 +7,7 @@ export interface Site {
   site_code: string;
   site_name: string;
   location?: string;
+  date?: string;
   created_at?: string;
   updated_at?: string;
 }

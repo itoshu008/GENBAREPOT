@@ -234,15 +234,16 @@ export async function syncSheetDataWithCoordinates(sheet: Sheet): Promise<{ coun
         // サイトコードを生成（現場名から、または日付+現場名のハッシュ）
         const siteCode = `${sheet.target_year}${sheet.target_month.toString().padStart(2, "0")}_${siteNameValue.substring(0, 10)}`;
 
-        // データベースに挿入
+        // データベースに挿入（日付も保存）
         await connection.execute(
-          `INSERT INTO sites (year, month, site_code, site_name, location)
-           VALUES (?, ?, ?, ?, ?)
+          `INSERT INTO sites (year, month, site_code, site_name, location, date)
+           VALUES (?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE
              site_name = VALUES(site_name),
              location = VALUES(location),
+             date = VALUES(date),
              updated_at = CURRENT_TIMESTAMP`,
-          [sheet.target_year, sheet.target_month, siteCode, siteNameValue, locationValue]
+          [sheet.target_year, sheet.target_month, siteCode, siteNameValue, locationValue, reportDate]
         );
 
         // スタッフマスタにも追加（存在しない場合）

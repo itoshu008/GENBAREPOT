@@ -22,6 +22,7 @@ function MasterPage() {
   const [sites, setSites] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
+  const [availableMonths, setAvailableMonths] = useState<number[]>([]);
   
   // 新規シート登録フォーム（複数追加可能）
   const [newSheetForms, setNewSheetForms] = useState<SheetFormData[]>([
@@ -53,6 +54,34 @@ function MasterPage() {
     loadSheets();
     loadSites();
   }, [year, month]);
+
+  // 利用可能な月のリストを取得
+  useEffect(() => {
+    const loadAvailableMonths = async () => {
+      try {
+        const response = await sheetsApi.getSheets({ target_year: year });
+        if (response.success) {
+          const monthsSet = new Set<number>();
+          response.data.forEach((sheet) => {
+            if (sheet.target_year === year) {
+              monthsSet.add(sheet.target_month);
+            }
+          });
+          const sortedMonths = Array.from(monthsSet).sort((a, b) => a - b);
+          const allMonths = Array.from({ length: 12 }, (_, i) => i + 1);
+          setAvailableMonths(sortedMonths.length > 0 ? sortedMonths : allMonths);
+        } else {
+          const allMonths = Array.from({ length: 12 }, (_, i) => i + 1);
+          setAvailableMonths(allMonths);
+        }
+      } catch (error) {
+        console.error("Error loading available months:", error);
+        const allMonths = Array.from({ length: 12 }, (_, i) => i + 1);
+        setAvailableMonths(allMonths);
+      }
+    };
+    loadAvailableMonths();
+  }, [year]);
 
   const loadSheets = async () => {
     try {
@@ -238,11 +267,19 @@ function MasterPage() {
                 onChange={(e) => setMonth(Number(e.target.value))}
                 disabled={loading}
               >
-                {months.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
+                {availableMonths.length > 0 ? (
+                  availableMonths.map((m) => (
+                    <option key={m} value={m}>
+                      {m}月
+                    </option>
+                  ))
+                ) : (
+                  months.map((m) => (
+                    <option key={m} value={m}>
+                      {m}月
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           </div>
@@ -450,26 +487,53 @@ function MasterPage() {
         </div>
 
         <div className="sites-section">
-          <h2>サイトマスタ一覧 ({year}年{month}月)</h2>
+          <h2>現場マスタ一覧 ({year}年{month}月)</h2>
           {sites.length === 0 ? (
             <p className="empty-message">データがありません</p>
           ) : (
             <table className="sites-table">
               <thead>
                 <tr>
-                  <th>サイトコード</th>
-                  <th>サイト名</th>
+                  <th>日付</th>
+                  <th>現場名</th>
                   <th>場所</th>
                 </tr>
               </thead>
               <tbody>
-                {sites.map((site) => (
-                  <tr key={site.id}>
-                    <td>{site.site_code}</td>
-                    <td>{site.site_name}</td>
-                    <td>{site.location || "-"}</td>
-                  </tr>
-                ))}
+                {sites.map((site) => {
+                  // 日付のフォーマット処理
+                  let dateDisplay = "-";
+                  if (site.date) {
+                    try {
+                      // 日付文字列をパース（YYYY-MM-DD形式を想定）
+                      const dateStr = site.date.toString();
+                      if (dateStr.includes("-")) {
+                        const [year, month, day] = dateStr.split("-");
+                        dateDisplay = `${year}年${parseInt(month)}月${parseInt(day)}日`;
+                      } else if (dateStr.includes("/")) {
+                        // YYYY/MM/DD形式の場合
+                        const [year, month, day] = dateStr.split("/");
+                        dateDisplay = `${year}年${parseInt(month)}月${parseInt(day)}日`;
+                      } else {
+                        // Dateオブジェクトとしてパースを試みる
+                        const dateObj = new Date(dateStr);
+                        if (!isNaN(dateObj.getTime())) {
+                          dateDisplay = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+                        }
+                      }
+                    } catch (error) {
+                      console.error("Error formatting date:", error, site.date);
+                      dateDisplay = site.date.toString();
+                    }
+                  }
+                  return (
+                    <tr key={site.id}>
+                      <td>{dateDisplay}</td>
+                      <td>{site.site_name}</td>
+                      <td>{site.location || "-"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
