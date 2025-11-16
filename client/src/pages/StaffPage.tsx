@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { reportsApi, Report } from "../services/reportsApi";
 import { mastersApi, Site } from "../services/mastersApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import "./StaffPage.css";
 
 function StaffPage() {
+  const navigate = useNavigate();
   const [reportDate, setReportDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
@@ -24,7 +26,7 @@ function StaffPage() {
 
   useEffect(() => {
     loadSites();
-  }, []);
+  }, [reportDate]);
 
   useEffect(() => {
     if (selectedSiteId) {
@@ -40,7 +42,42 @@ function StaffPage() {
         month: currentMonth,
       });
       if (response.success) {
-        setSites(response.data);
+        // 選択された日付に関連する報告書がある現場を取得
+        let sitesWithReports: number[] = [];
+        try {
+          const reportsResponse = await reportsApi.getReports({
+            role: "staff",
+            date_from: reportDate,
+            date_to: reportDate,
+          });
+          if (reportsResponse.success) {
+            sitesWithReports = reportsResponse.data
+              .map((r) => r.site_id)
+              .filter((id): id is number => id !== undefined);
+          }
+        } catch (error) {
+          // 報告書の取得に失敗しても続行
+          console.warn("Error loading reports for sorting:", error);
+        }
+
+        // ソート: 日付（報告書がある現場を優先） → 場所 → 現場名の順
+        const sortedSites = [...response.data].sort((a, b) => {
+          // 1. 日付でソート: 選択された日付に報告書がある現場を優先
+          const aHasReport = a.id && sitesWithReports.includes(a.id);
+          const bHasReport = b.id && sitesWithReports.includes(b.id);
+          if (aHasReport !== bHasReport) {
+            return aHasReport ? -1 : 1;
+          }
+          // 2. 場所でソート
+          const locationA = a.location || "";
+          const locationB = b.location || "";
+          if (locationA !== locationB) {
+            return locationA.localeCompare(locationB, "ja");
+          }
+          // 3. 現場名でソート
+          return a.site_name.localeCompare(b.site_name, "ja");
+        });
+        setSites(sortedSites);
       }
     } catch (error) {
       console.error("Error loading sites:", error);
@@ -167,7 +204,15 @@ function StaffPage() {
   return (
     <div className="staff-page">
       <div className="container">
-        <h1>現場報告書 - スタッフ</h1>
+        <div className="page-header">
+          <h1>現場報告書 - スタッフ</h1>
+          <button
+            onClick={() => navigate("/chief")}
+            className="btn btn-header"
+          >
+            チーフページへ
+          </button>
+        </div>
 
         <div className="form-section">
           <div className="form-group">

@@ -39,7 +39,11 @@ async function fetchSheetData(url: string, dateCol: string, siteNameCol: string,
 
   // Google Sheets APIが使えるか確認（環境変数が設定されているか）
   const hasGoogleSheetsKey = process.env.GOOGLE_SHEETS_KEY_FILE && process.env.GOOGLE_SHEETS_KEY_FILE.trim() !== "";
+  const hasApiKey = process.env.GOOGLE_SHEETS_API_KEY && process.env.GOOGLE_SHEETS_API_KEY.trim() !== "";
 
+  let serviceAccountError: any = null;
+
+  // サービスアカウントを試す
   if (hasGoogleSheetsKey) {
     try {
       // Google Sheets APIを使用（非公開シートにもアクセス可能）
@@ -63,7 +67,35 @@ async function fetchSheetData(url: string, dateCol: string, siteNameCol: string,
       const values = await getValues(spreadsheetId, range);
       return values;
     } catch (error: any) {
-      console.warn("Google Sheets API failed, falling back to CSV:", error.message);
+      serviceAccountError = error;
+      console.warn("Google Sheets API (service account) failed:", error.message);
+    }
+  }
+
+  // APIキーを試す（サービスアカウントが失敗した場合、またはAPIキーのみが設定されている場合）
+  if (hasApiKey) {
+    try {
+      // APIキーを使用（公開シートのみ）
+      const sheetName = await determineSheetName(spreadsheetId, null);
+      
+      // 最大列を計算
+      const colIndices = [
+        columnToIndex(dateCol),
+        columnToIndex(siteNameCol),
+        locationCol ? columnToIndex(locationCol) : -1,
+        columnToIndex(staffCol),
+      ].filter((idx) => idx >= 0);
+      
+      const maxColIdx = Math.max(...colIndices);
+      const endCol = indexToColumn(maxColIdx);
+      
+      // 範囲を指定（開始列から最大列まで、開始行から1000行まで）
+      const range = `${sheetName}!${dateCol}${startRow}:${endCol}1000`;
+      
+      const values = await getValues(spreadsheetId, range);
+      return values;
+    } catch (error: any) {
+      console.warn("Google Sheets API (API key) failed:", error.message);
       // フォールバック: CSVエクスポートURLを使用
     }
   }

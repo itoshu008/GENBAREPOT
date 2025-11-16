@@ -15,11 +15,22 @@ export function extractSheetId(url: string): string | null {
  * Google Sheets APIで認証を取得
  */
 async function getAuth() {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_SHEETS_KEY_FILE,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-  });
-  return auth;
+  // サービスアカウントのJSONキーファイルがある場合はそれを使用
+  if (process.env.GOOGLE_SHEETS_KEY_FILE && process.env.GOOGLE_SHEETS_KEY_FILE.trim() !== "") {
+    const auth = new google.auth.GoogleAuth({
+      keyFile: process.env.GOOGLE_SHEETS_KEY_FILE,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    });
+    return auth;
+  }
+  
+  // APIキーがある場合はそれを使用（公開シートのみ）
+  if (process.env.GOOGLE_SHEETS_API_KEY && process.env.GOOGLE_SHEETS_API_KEY.trim() !== "") {
+    // APIキーの場合は認証オブジェクトを返す
+    return process.env.GOOGLE_SHEETS_API_KEY;
+  }
+  
+  throw new Error("GOOGLE_SHEETS_KEY_FILE or GOOGLE_SHEETS_API_KEY must be set");
 }
 
 /**
@@ -28,11 +39,22 @@ async function getAuth() {
 export async function getSheetNames(spreadsheetId: string): Promise<string[]> {
   try {
     const auth = await getAuth();
-    const sheets = google.sheets({ version: "v4", auth });
-
-    const response = await sheets.spreadsheets.get({
-      spreadsheetId,
+    const sheets = google.sheets({ 
+      version: "v4", 
+      auth: typeof auth === "string" ? undefined : auth,
+      // APIキーの場合はクエリパラメータで指定
     });
+
+    const requestParams: any = {
+      spreadsheetId,
+    };
+    
+    // APIキーの場合はクエリパラメータで指定
+    if (typeof auth === "string") {
+      requestParams.key = auth;
+    }
+
+    const response = await sheets.spreadsheets.get(requestParams);
 
     const sheetNames =
       response.data.sheets?.map((sheet) => sheet.properties?.title || "") || [];
@@ -52,12 +74,22 @@ export async function getValues(
 ): Promise<string[][]> {
   try {
     const auth = await getAuth();
-    const sheets = google.sheets({ version: "v4", auth });
+    const sheets = google.sheets({ 
+      version: "v4", 
+      auth: typeof auth === "string" ? undefined : auth,
+    });
 
-    const response = await sheets.spreadsheets.values.get({
+    const requestParams: any = {
       spreadsheetId,
       range,
-    });
+    };
+    
+    // APIキーの場合はクエリパラメータで指定
+    if (typeof auth === "string") {
+      requestParams.key = auth;
+    }
+
+    const response = await sheets.spreadsheets.values.get(requestParams);
 
     return response.data.values || [];
   } catch (error) {

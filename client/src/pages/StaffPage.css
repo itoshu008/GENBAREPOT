@@ -17,6 +17,37 @@
   color: #333;
 }
 
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.btn-header {
+  padding: 10px 20px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn-header:hover {
+  background-color: #218838;
+}
+
 .form-section {
   margin-bottom: 20px;
 }
@@ -150,6 +181,15 @@
 
   .staff-page .container {
     padding: 15px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .btn-header {
+    width: 100%;
   }
 
   .button-group {
