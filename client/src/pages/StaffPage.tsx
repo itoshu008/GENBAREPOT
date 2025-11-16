@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { reportsApi, Report } from "../services/reportsApi";
 import { mastersApi, Site } from "../services/mastersApi";
+import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import "./StaffPage.css";
 
 function StaffPage() {
@@ -140,6 +141,28 @@ function StaffPage() {
     ? currentReport.status === "staff_draft" ||
       currentReport.status === "returned_by_sales"
     : true;
+
+  // リアルタイム更新: 現在の報告書が更新されたら再取得
+  useRealtimeReport(
+    currentReport?.id,
+    async () => {
+      if (currentReport?.id) {
+        const response = await reportsApi.getReport(currentReport.id);
+        if (response.success) {
+          setCurrentReport(response.data);
+        }
+      }
+    },
+    async (status) => {
+      // ステータス変更時も再取得
+      if (currentReport?.id) {
+        const response = await reportsApi.getReport(currentReport.id);
+        if (response.success) {
+          setCurrentReport(response.data);
+        }
+      }
+    }
+  );
 
   return (
     <div className="staff-page">

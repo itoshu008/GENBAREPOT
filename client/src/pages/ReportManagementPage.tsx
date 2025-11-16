@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { reportsApi, ReportWithDetails } from "../services/reportsApi";
+import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import "./ReportManagementPage.css";
 
 function ReportManagementPage() {
@@ -69,6 +70,19 @@ function ReportManagementPage() {
       console.error("Error loading report:", error);
     }
   };
+
+  // リアルタイム更新: 選択中の報告書が更新されたら再取得（編集中でない場合のみ）
+  useRealtimeReport(
+    selectedReport?.id && !isEditing ? selectedReport.id : null,
+    async () => {
+      if (selectedReport?.id && !isEditing) {
+        const response = await reportsApi.getReport(selectedReport.id);
+        if (response.success) {
+          setSelectedReport(response.data);
+        }
+      }
+    }
+  );
 
   const handleEdit = () => {
     setIsEditing(true);

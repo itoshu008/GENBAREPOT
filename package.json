@@ -14,8 +14,12 @@
     "build": "npm run build:server && npm run build:client",
     "build:server": "cd server && npm run build",
     "build:client": "cd client && npm run build",
-    "start": "cd server && npm run start",
-    "migrate": "cd server && mysql -u genbareport_user -pzatint_6487 genbareport_db < database/migrations/001_initial_schema.sql"
+    "start": "cd server && NODE_ENV=production npm run start",
+    "migrate": "cd server && mysql -u genbareport_user -pzatint_6487 genbareport_db < database/migrations/001_initial_schema.sql",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:restart": "pm2 restart genbareport --update-env",
+    "pm2:stop": "pm2 stop genbareport",
+    "pm2:logs": "pm2 logs genbareport"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

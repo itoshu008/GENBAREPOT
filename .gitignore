@@ -12,4 +12,6 @@ server/dist/
 *.json
 !package.json
 !tsconfig.json
+logs/
+*.log
 

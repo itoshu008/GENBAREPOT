@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { reportsApi, ReportWithDetails } from "../services/reportsApi";
+import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import "./ChiefPage.css";
 
 function ChiefPage() {
@@ -63,6 +64,30 @@ function ChiefPage() {
       console.error("Error loading report:", error);
     }
   };
+
+  // リアルタイム更新: 選択中の報告書が更新されたら再取得
+  useRealtimeReport(
+    selectedReport?.id,
+    async () => {
+      if (selectedReport?.id) {
+        const response = await reportsApi.getReport(selectedReport.id);
+        if (response.success) {
+          setSelectedReport(response.data);
+        }
+      }
+    },
+    async (status) => {
+      // ステータス変更時も再取得
+      if (selectedReport?.id) {
+        const response = await reportsApi.getReport(selectedReport.id);
+        if (response.success) {
+          setSelectedReport(response.data);
+        }
+        // ステータスが変更されたら一覧も更新
+        loadReports();
+      }
+    }
+  );
 
   const handleUpdateTimes = async () => {
     if (!selectedReport?.id) return;

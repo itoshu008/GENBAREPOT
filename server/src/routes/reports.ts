@@ -9,6 +9,12 @@ import {
   ReportTime,
   ReportStaffEntry,
 } from "../types/reports";
+import {
+  emitReportCreated,
+  emitReportUpdated,
+  emitReportStatusChanged,
+  emitReportStaffUpdated,
+} from "../socket";
 
 const router = Router();
 
@@ -199,8 +205,8 @@ export default function reportRoutes(io: Server) {
 
         await connection.commit();
 
-        // Socket.IOで通知
-        io.emit("report:created", { report_id: reportId });
+        // Socket.IOで通知（リアルタイム更新）
+        emitReportCreated(io, reportId);
 
         res.json({
           success: true,
@@ -266,8 +272,8 @@ export default function reportRoutes(io: Server) {
         updateValues
       );
 
-      // Socket.IOで通知
-      io.emit("report:updated", { report_id: id });
+      // Socket.IOで通知（リアルタイム更新）
+      emitReportUpdated(io, parseInt(id));
 
       res.json({ success: true, message: "Report updated" });
     } catch (error: any) {
@@ -329,8 +335,8 @@ export default function reportRoutes(io: Server) {
 
         await connection.commit();
 
-        // Socket.IOで通知
-        io.emit("report:statusChanged", { report_id: id, status });
+        // Socket.IOで通知（リアルタイム更新）
+        emitReportStatusChanged(io, parseInt(id), status);
 
         res.json({ success: true, message: "Status updated" });
       } catch (error) {
@@ -445,8 +451,8 @@ export default function reportRoutes(io: Server) {
         );
       }
 
-      // Socket.IOで通知
-      io.emit("report:staffUpdated", { report_id: id });
+      // Socket.IOで通知（リアルタイム更新）
+      emitReportStaffUpdated(io, parseInt(id));
 
       res.json({ success: true, message: "Staff entry updated" });
     } catch (error: any) {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { reportsApi, ReportWithDetails, ReportStatus } from "../services/reportsApi";
+import { useRealtimeReport, useRealtimeRole } from "../hooks/useRealtimeReport";
 import "./SalesPage.css";
 
 function SalesPage() {
@@ -61,6 +62,34 @@ function SalesPage() {
       console.error("Error loading report:", error);
     }
   };
+
+  // リアルタイム更新: 営業ロール向けの更新を監視
+  useRealtimeRole("sales", () => {
+    loadReports();
+  });
+
+  // リアルタイム更新: 選択中の報告書が更新されたら再取得
+  useRealtimeReport(
+    selectedReport?.id,
+    async () => {
+      if (selectedReport?.id) {
+        const response = await reportsApi.getReport(selectedReport.id);
+        if (response.success) {
+          setSelectedReport(response.data);
+        }
+      }
+    },
+    async (status) => {
+      // ステータス変更時も再取得
+      if (selectedReport?.id) {
+        const response = await reportsApi.getReport(selectedReport.id);
+        if (response.success) {
+          setSelectedReport(response.data);
+        }
+        loadReports();
+      }
+    }
+  );
 
   const handleSubmitToAccounting = async () => {
     if (!selectedReport?.id) return;

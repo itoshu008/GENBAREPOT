@@ -37,12 +37,13 @@ cp .env.example .env
 
 必要な環境変数：
 ```
-PORT=3001
+PORT=4100
 CLIENT_URL=http://localhost:5173
 DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=genba_report
+DB_USER=genbareport_user
+DB_PASSWORD=zatint_6487
+DB_NAME=genbareport_db
+DB_PORT=3306
 GOOGLE_SHEETS_KEY_FILE=./keys/service-account-key.json
 ```
 
@@ -58,7 +59,7 @@ cp .env.example .env
 ```
 
 ```
-VITE_API_URL=http://localhost:3001
+VITE_API_URL=http://localhost:4100
 ```
 
 ### 3. Google Sheets API サービスアカウント
@@ -85,11 +86,40 @@ npm run dev
 ```
 
 - フロントエンド: http://localhost:5173
-- バックエンド: http://localhost:3001
+- バックエンド: http://localhost:4100
 
 ## デプロイ
 
 VPS（Node.js + MySQL）へのデプロイを前提としています。
+
+### 本番環境での起動
+
+**PM2を使用した起動（推奨）:**
+
+```bash
+# 初回起動
+npm run pm2:start
+# または
+pm2 start ecosystem.config.js
+
+# 再起動
+npm run pm2:restart
+# または
+pm2 restart genbareport --update-env
+```
+
+**ポート**: 4100（既存アプリと競合しません）
+
+**データベース**: genbareport_db（専用データベース）
+
+詳細なデプロイ手順は [DEPLOYMENT.md](./DEPLOYMENT.md) を参照してください。
+
+### リアルタイム更新機能
+
+このアプリは Socket.IO を使用してリアルタイム更新を実現しています：
+
+- 報告書の作成・更新・ステータス変更が即座に反映されます
+- 複数のクライアント（スタッフのスマホ、営業のPCなど）が同じ報告書を見ていても、状態変更がリアルタイムに同期されます
 
 **注意**: 本番環境のURLは、デプロイ後に適切なドメインまたはIPアドレスを設定してください。既存のアプリケーションと干渉しないよう、別のポート番号またはサブドメインを使用することを推奨します。
 
