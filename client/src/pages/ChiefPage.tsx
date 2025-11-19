@@ -25,6 +25,10 @@ function ChiefPage() {
   const [finishTime, setFinishTime] = useState<string>("");
   const [departureTime, setDepartureTime] = useState<string>("");
   const [chiefReportContent, setChiefReportContent] = useState<string>("");
+  
+  // 基本スタッフ報告欄の編集状態
+  const [isEditingStaffReport, setIsEditingStaffReport] = useState<boolean>(false);
+  const [staffReportContent, setStaffReportContent] = useState<string>("");
 
   useEffect(() => {
     loadSheetData();
@@ -140,6 +144,8 @@ function ChiefPage() {
       setFinishTime(selectedReport.times?.finish_time?.substring(0, 5) || "");
       setDepartureTime(selectedReport.times?.departure_time?.substring(0, 5) || "");
       setChiefReportContent(selectedReport.chief_report_content || "");
+      setStaffReportContent(selectedReport.staff_report_content || "");
+      setIsEditingStaffReport(false);
     }
   }, [selectedReport]);
 
@@ -271,6 +277,70 @@ function ChiefPage() {
     } catch (error) {
       console.error("Error updating staff entry:", error);
     }
+  };
+
+  const handleUpdateStaffReport = async () => {
+    if (!selectedReport?.id) return;
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      await reportsApi.updateReport(selectedReport.id, {
+        staff_report_content: staffReportContent,
+        updated_by: chiefName || "chief",
+      });
+
+      setMessage({ type: "success", text: "基本スタッフ報告欄を更新しました" });
+      setIsEditingStaffReport(false);
+      // 報告書を再取得
+      const response = await reportsApi.getReport(selectedReport.id);
+      if (response.success) {
+        setSelectedReport(response.data);
+      }
+    } catch (error: any) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || "更新に失敗しました",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteStaffReport = async () => {
+    if (!selectedReport?.id) return;
+    if (!window.confirm("基本スタッフ報告欄を削除しますか？")) return;
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      await reportsApi.updateReport(selectedReport.id, {
+        staff_report_content: "",
+        updated_by: chiefName || "chief",
+      });
+
+      setMessage({ type: "success", text: "基本スタッフ報告欄を削除しました" });
+      setIsEditingStaffReport(false);
+      // 報告書を再取得
+      const response = await reportsApi.getReport(selectedReport.id);
+      if (response.success) {
+        setSelectedReport(response.data);
+      }
+    } catch (error: any) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || "削除に失敗しました",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEditStaffReport = () => {
+    setStaffReportContent(selectedReport?.staff_report_content || "");
+    setIsEditingStaffReport(false);
   };
 
   const handleSubmitToSales = async () => {
@@ -445,6 +515,68 @@ function ChiefPage() {
               <button onClick={handleUpdateTimes} className="btn btn-secondary">
                 時間を保存
               </button>
+            </div>
+
+            <div className="form-group">
+              <label>基本スタッフ報告欄</label>
+              <div style={{ marginBottom: "10px" }}>
+                {isEditingStaffReport ? (
+                  <>
+                    <textarea
+                      value={staffReportContent}
+                      onChange={(e) => setStaffReportContent(e.target.value)}
+                      rows={4}
+                      placeholder="基本スタッフ報告内容を記入してください"
+                      style={{ width: "100%", marginBottom: "10px" }}
+                    />
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <button
+                        onClick={handleUpdateStaffReport}
+                        disabled={loading}
+                        className="btn btn-primary"
+                      >
+                        更新
+                      </button>
+                      <button
+                        onClick={handleDeleteStaffReport}
+                        disabled={loading}
+                        className="btn btn-danger"
+                      >
+                        削除
+                      </button>
+                      <button
+                        onClick={handleCancelEditStaffReport}
+                        disabled={loading}
+                        className="btn btn-secondary"
+                      >
+                        キャンセル
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        padding: "10px",
+                        border: "1px solid #ddd",
+                        borderRadius: "4px",
+                        backgroundColor: "#f9f9f9",
+                        minHeight: "60px",
+                        whiteSpace: "pre-wrap",
+                        marginBottom: "10px",
+                      }}
+                    >
+                      {selectedReport.staff_report_content || "-"}
+                    </div>
+                    <button
+                      onClick={() => setIsEditingStaffReport(true)}
+                      className="btn btn-secondary"
+                    >
+                      修正
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="form-group">
