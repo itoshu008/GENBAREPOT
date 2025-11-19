@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { reportsApi, ReportWithDetails } from "../services/reportsApi";
+import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import "./ChiefPage.css";
 
@@ -12,6 +13,8 @@ function ChiefPage() {
   );
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
+  const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
 
   // 時間記録の状態
   const [meetingTime, setMeetingTime] = useState<string>("");
@@ -21,8 +24,36 @@ function ChiefPage() {
   const [chiefReportContent, setChiefReportContent] = useState<string>("");
 
   useEffect(() => {
+    loadSheetData();
     loadReports();
-  }, [dateFilter, chiefName]);
+    setSelectedLocation("");
+  }, [dateFilter]);
+
+  useEffect(() => {
+    loadReports();
+  }, [chiefName, selectedLocation]);
+
+  // スプレッドシートから日付でデータを取得
+  const loadSheetData = async () => {
+    try {
+      const response = await sheetsApi.getSheetDataByDate(dateFilter);
+      if (response.success) {
+        setSheetData(response.data);
+      }
+    } catch (error) {
+      console.warn("Error loading sheet data:", error);
+      setSheetData([]);
+    }
+  };
+
+  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータから）
+  const availableLocations = Array.from(
+    new Set(
+      sheetData
+        .map((row) => row.location)
+        .filter((l): l is string => !!l)
+    )
+  ).sort((a, b) => a.localeCompare(b, "ja"));
 
   useEffect(() => {
     if (selectedReport) {
@@ -42,6 +73,7 @@ function ChiefPage() {
         date_from: dateFilter,
         date_to: dateFilter,
         chief_name: chiefName || undefined,
+        location: selectedLocation || undefined,
         status: "staff_submitted",
       });
       if (response.success) {
@@ -194,6 +226,20 @@ function ChiefPage() {
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
             />
+          </div>
+          <div className="form-group">
+            <label>場所</label>
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+            >
+              <option value="">すべての場所</option>
+              {availableLocations.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label>チーフ名</label>

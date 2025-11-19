@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { reportsApi, ReportWithDetails } from "../services/reportsApi";
+import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport, useRealtimeRole } from "../hooks/useRealtimeReport";
 import "./AccountingPage.css";
 
@@ -8,15 +9,45 @@ function AccountingPage() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
+  const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
 
   // フィルタ
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [siteName, setSiteName] = useState<string>("");
+  const [location, setLocation] = useState<string>("");
 
   // コメント
   const [accountingComment, setAccountingComment] = useState<string>("");
   const [returnReason, setReturnReason] = useState<string>("");
+
+  useEffect(() => {
+    if (dateFrom) {
+      loadSheetData();
+    }
+  }, [dateFrom]);
+
+  // スプレッドシートから日付でデータを取得（開始日付を基準）
+  const loadSheetData = async () => {
+    try {
+      const response = await sheetsApi.getSheetDataByDate(dateFrom);
+      if (response.success) {
+        setSheetData(response.data);
+      }
+    } catch (error) {
+      console.warn("Error loading sheet data:", error);
+      setSheetData([]);
+    }
+  };
+
+  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータから）
+  const availableLocations = Array.from(
+    new Set(
+      sheetData
+        .map((row) => row.location)
+        .filter((l): l is string => !!l)
+    )
+  ).sort((a, b) => a.localeCompare(b, "ja"));
 
   useEffect(() => {
     loadReports();
@@ -37,6 +68,7 @@ function AccountingPage() {
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
         site_name: siteName || undefined,
+        location: location || undefined,
         status: "submitted_to_accounting",
       });
       if (response.success) {
@@ -183,6 +215,20 @@ function AccountingPage() {
               onChange={(e) => setSiteName(e.target.value)}
               placeholder="検索"
             />
+          </div>
+          <div className="form-group">
+            <label>場所</label>
+            <select
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            >
+              <option value="">すべての場所</option>
+              {availableLocations.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </select>
           </div>
           <button onClick={loadReports} className="btn btn-primary">
             検索

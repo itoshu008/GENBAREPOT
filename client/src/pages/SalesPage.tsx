@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { reportsApi, ReportWithDetails, ReportStatus } from "../services/reportsApi";
+import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport, useRealtimeRole } from "../hooks/useRealtimeReport";
 import "./SalesPage.css";
 
@@ -8,6 +9,7 @@ function SalesPage() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
+  const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
 
   // フィルタ
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -19,6 +21,34 @@ function SalesPage() {
   // コメント
   const [salesComment, setSalesComment] = useState<string>("");
   const [returnReason, setReturnReason] = useState<string>("");
+
+  useEffect(() => {
+    if (dateFrom) {
+      loadSheetData();
+    }
+  }, [dateFrom]);
+
+  // スプレッドシートから日付でデータを取得（開始日付を基準）
+  const loadSheetData = async () => {
+    try {
+      const response = await sheetsApi.getSheetDataByDate(dateFrom);
+      if (response.success) {
+        setSheetData(response.data);
+      }
+    } catch (error) {
+      console.warn("Error loading sheet data:", error);
+      setSheetData([]);
+    }
+  };
+
+  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータから）
+  const availableLocations = Array.from(
+    new Set(
+      sheetData
+        .map((row) => row.location)
+        .filter((l): l is string => !!l)
+    )
+  ).sort((a, b) => a.localeCompare(b, "ja"));
 
   useEffect(() => {
     loadReports();
@@ -189,12 +219,17 @@ function SalesPage() {
           </div>
           <div className="form-group">
             <label>場所</label>
-            <input
-              type="text"
+            <select
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="検索"
-            />
+            >
+              <option value="">すべての場所</option>
+              {availableLocations.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label>ステータス</label>
