@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import {
   reportsApi,
   ReportWithDetails,
@@ -7,6 +7,17 @@ import {
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import "./ChiefPage.css";
+
+const formatStaffRoles = (roles?: string | null) => {
+  if (!roles) return "-";
+  return roles
+    .split(",")
+    .map((role) => {
+      const [label, detail] = role.split(":");
+      return detail ? `${label}:${detail}` : label;
+    })
+    .join(" / ");
+};
 
 const formatStaffRoles = (roles?: string | null) => {
   if (!roles) return "-";
@@ -660,7 +671,6 @@ function ChiefPage() {
                     <tr>
                       <th>スタッフ名</th>
                       <th>役割</th>
-                      <th>報告内容</th>
                       <th>運転</th>
                       <th>洗濯</th>
                       <th>仕切</th>
@@ -670,78 +680,84 @@ function ChiefPage() {
                   </thead>
                   <tbody>
                     {selectedReport.staff_entries.map((entry) => (
-                      <tr key={entry.id}>
-                        <td>{entry.staff_name}</td>
-                        <td>{formatStaffRoles(selectedReport.staff_roles)}</td>
-                        <td style={{ whiteSpace: "pre-wrap" }}>
-                          {entry.report_content || "-"}
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={entry.is_driving || false}
-                            onChange={(e) =>
-                              handleAllowanceToggle(
-                                entry,
-                                "is_driving",
-                                e.target.checked
-                              )
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={entry.is_laundry || false}
-                            onChange={(e) =>
-                              handleAllowanceToggle(
-                                entry,
-                                "is_laundry",
-                                e.target.checked
-                              )
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={entry.is_partition || false}
-                            onChange={(e) =>
-                              handleAllowanceToggle(
-                                entry,
-                                "is_partition",
-                                e.target.checked
-                              )
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={entry.is_warehouse || false}
-                            onChange={(e) =>
-                              handleAllowanceToggle(
-                                entry,
-                                "is_warehouse",
-                                e.target.checked
-                              )
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={entry.is_accommodation || false}
-                            onChange={(e) =>
-                              handleAllowanceToggle(
-                                entry,
-                                "is_accommodation",
-                                e.target.checked
-                              )
-                            }
-                          />
-                        </td>
-                      </tr>
+                      <Fragment key={entry.id || entry.staff_name}>
+                        <tr>
+                          <td>{entry.staff_name}</td>
+                          <td>{formatStaffRoles(selectedReport.staff_roles)}</td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={entry.is_driving || false}
+                              onChange={(e) =>
+                                handleAllowanceToggle(
+                                  entry,
+                                  "is_driving",
+                                  e.target.checked
+                                )
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={entry.is_laundry || false}
+                              onChange={(e) =>
+                                handleAllowanceToggle(
+                                  entry,
+                                  "is_laundry",
+                                  e.target.checked
+                                )
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={entry.is_partition || false}
+                              onChange={(e) =>
+                                handleAllowanceToggle(
+                                  entry,
+                                  "is_partition",
+                                  e.target.checked
+                                )
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={entry.is_warehouse || false}
+                              onChange={(e) =>
+                                handleAllowanceToggle(
+                                  entry,
+                                  "is_warehouse",
+                                  e.target.checked
+                                )
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={entry.is_accommodation || false}
+                              onChange={(e) =>
+                                handleAllowanceToggle(
+                                  entry,
+                                  "is_accommodation",
+                                  e.target.checked
+                                )
+                              }
+                            />
+                          </td>
+                        </tr>
+                        <tr>
+                          <td colSpan={7}>
+                            <div className="staff-report-content">
+                              {entry.report_content || "-"}
+                            </div>
+                          </td>
+                        </tr>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

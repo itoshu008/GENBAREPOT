@@ -135,6 +135,15 @@
   cursor: pointer;
 }
 
+.staff-report-content {
+  padding: 12px 14px;
+  background-color: #fdfdfd;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  min-height: 60px;
+}
+
 .form-group {
   margin-bottom: 15px;
 }
