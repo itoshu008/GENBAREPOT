@@ -387,16 +387,17 @@ function StaffPage() {
       if (!reportDate || !selectedSiteName || !staffName) return;
       
       try {
+        // 同日の別現場でも提出可能にするため、site_nameも指定してフィルタリング
         const response = await reportsApi.getReports({
           role: "staff",
           date_from: reportDate,
           date_to: reportDate,
           staff_name: staffName,
+          site_name: selectedSiteName, // 現場名も指定して、同日の別現場で同じ人が提出可能にする
         });
         if (response.success && response.data.length > 0) {
-          const report = response.data.find(
-            (r) => r.site_name === selectedSiteName
-          );
+          // site_nameでフィルタリング済みなので、最初の1件を取得
+          const report = response.data[0];
           if (report && report.id) {
             // 詳細を取得（staff_entries含む）
             const detailResponse = await reportsApi.getReport(report.id);

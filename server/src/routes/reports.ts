@@ -46,7 +46,7 @@ export default function reportRoutes(io: Server) {
 
       // ロール別フィルタ
       if (role === "staff") {
-        // スタッフは自分の報告書のみ
+        // スタッフは自分の報告書のみ（同日の別現場でも提出可能にするため、site_nameも考慮）
         query += ` AND r.created_by = ?`;
         params.push(req.query.staff_name || "");
       } else if (role === "chief") {
