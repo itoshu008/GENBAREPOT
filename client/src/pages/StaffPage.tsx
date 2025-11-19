@@ -599,18 +599,6 @@ function StaffPage() {
                 />
                 スタッフ
               </label>
-              {staffRoles.staff && (
-                <div style={{ marginTop: "10px" }}>
-                  <input
-                    type="text"
-                    value={staffRoleStaffText}
-                    onChange={(e) => setStaffRoleStaffText(e.target.value)}
-                    disabled={loading || !canEdit}
-                    placeholder="何のポジション？"
-                    style={{ width: "100%", padding: "8px", marginTop: "5px" }}
-                  />
-                </div>
-              )}
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -622,18 +610,6 @@ function StaffPage() {
                 />
                 アクター
               </label>
-              {staffRoles.actor && (
-                <div style={{ marginTop: "10px" }}>
-                  <input
-                    type="text"
-                    value={staffRoleActorText}
-                    onChange={(e) => setStaffRoleActorText(e.target.value)}
-                    disabled={loading || !canEdit}
-                    placeholder="キャラクター名"
-                    style={{ width: "100%", padding: "8px", marginTop: "5px" }}
-                  />
-                </div>
-              )}
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -645,18 +621,6 @@ function StaffPage() {
                 />
                 アテンド
               </label>
-              {staffRoles.attend && (
-                <div style={{ marginTop: "10px" }}>
-                  <input
-                    type="text"
-                    value={staffRoleAttendText}
-                    onChange={(e) => setStaffRoleAttendText(e.target.value)}
-                    disabled={loading || !canEdit}
-                    placeholder="なんのキャラクターのアテンド"
-                    style={{ width: "100%", padding: "8px", marginTop: "5px" }}
-                  />
-                </div>
-              )}
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -669,6 +633,42 @@ function StaffPage() {
                 その他
               </label>
             </div>
+            {staffRoles.staff && (
+              <div style={{ marginTop: "10px" }}>
+                <input
+                  type="text"
+                  value={staffRoleStaffText}
+                  onChange={(e) => setStaffRoleStaffText(e.target.value)}
+                  disabled={loading || !canEdit}
+                  placeholder="何のポジション？"
+                  style={{ width: "100%", padding: "8px", marginTop: "5px" }}
+                />
+              </div>
+            )}
+            {staffRoles.actor && (
+              <div style={{ marginTop: "10px" }}>
+                <input
+                  type="text"
+                  value={staffRoleActorText}
+                  onChange={(e) => setStaffRoleActorText(e.target.value)}
+                  disabled={loading || !canEdit}
+                  placeholder="キャラクター名"
+                  style={{ width: "100%", padding: "8px", marginTop: "5px" }}
+                />
+              </div>
+            )}
+            {staffRoles.attend && (
+              <div style={{ marginTop: "10px" }}>
+                <input
+                  type="text"
+                  value={staffRoleAttendText}
+                  onChange={(e) => setStaffRoleAttendText(e.target.value)}
+                  disabled={loading || !canEdit}
+                  placeholder="なんのキャラクターのアテンド"
+                  style={{ width: "100%", padding: "8px", marginTop: "5px" }}
+                />
+              </div>
+            )}
             {staffRoles.other && (
               <div style={{ marginTop: "10px" }}>
                 <input
