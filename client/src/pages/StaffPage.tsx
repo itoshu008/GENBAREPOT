@@ -784,7 +784,7 @@ function StaffPage() {
               <button
                 onClick={handleSubmit}
                 disabled={loading || !currentReport?.id}
-                className="btn btn-secondary"
+                className="btn btn-danger"
               >
                 チーフへ提出
               </button>

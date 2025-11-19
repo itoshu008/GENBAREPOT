@@ -129,6 +129,15 @@
   background-color: #218838;
 }
 
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
 .message {
   padding: 12px;
   border-radius: 4px;
