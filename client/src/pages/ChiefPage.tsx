@@ -6,6 +6,7 @@ import "./ChiefPage.css";
 
 function ChiefPage() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
+  const [availableReports, setAvailableReports] = useState<ReportWithDetails[]>([]);
   const [chiefName, setChiefName] = useState<string>("");
   const [dateFilter, setDateFilter] = useState<string>(
     new Date().toISOString().split("T")[0]
@@ -28,13 +29,22 @@ function ChiefPage() {
     setSelectedLocation("");
     setSelectedSiteName("");
     setSelectedReport(null);
+    setAvailableReports([]);
   }, [dateFilter]);
+
+  useEffect(() => {
+    // 場所が変更されたら現場名をリセット
+    setSelectedSiteName("");
+    setSelectedReport(null);
+    setAvailableReports([]);
+  }, [selectedLocation]);
 
   useEffect(() => {
     if (selectedSiteName && dateFilter) {
       loadReportBySite();
     } else {
       setSelectedReport(null);
+      setAvailableReports([]);
     }
   }, [selectedSiteName, dateFilter]);
 
@@ -60,18 +70,15 @@ function ChiefPage() {
     )
   ).sort((a, b) => a.localeCompare(b, "ja"));
 
-  // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータから）
-  const filteredSites = selectedLocation
-    ? sheetData
-        .filter((row) => row.location === selectedLocation)
-        .map((row) => ({
-          site_name: row.site_name,
-          location: row.location,
-        }))
-    : sheetData.map((row) => ({
-        site_name: row.site_name,
-        location: row.location,
-      }));
+  // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータから、重複を除去）
+  const filteredSites = Array.from(
+    new Map(
+      (selectedLocation
+        ? sheetData.filter((row) => row.location === selectedLocation)
+        : sheetData
+      ).map((row) => [row.site_name, { site_name: row.site_name, location: row.location }])
+    ).values()
+  );
 
   useEffect(() => {
     if (selectedReport) {
@@ -97,20 +104,39 @@ function ChiefPage() {
         status: "staff_submitted",
       });
       if (response.success && response.data.length > 0) {
-        // 最初の報告書を選択
-        const report = response.data[0];
-        const detailResponse = await reportsApi.getReport(report.id!);
-        if (detailResponse.success) {
-          setSelectedReport(detailResponse.data);
+        setAvailableReports(response.data);
+        // 報告書が1つだけの場合は自動選択
+        if (response.data.length === 1) {
+          const detailResponse = await reportsApi.getReport(response.data[0].id!);
+          if (detailResponse.success) {
+            setSelectedReport(detailResponse.data);
+          }
+        } else {
+          // 複数の場合は選択をリセット
+          setSelectedReport(null);
         }
       } else {
+        setAvailableReports([]);
         setSelectedReport(null);
       }
     } catch (error) {
       console.error("Error loading report:", error);
+      setAvailableReports([]);
       setSelectedReport(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 報告書を選択
+  const handleReportSelect = async (reportId: number) => {
+    try {
+      const response = await reportsApi.getReport(reportId);
+      if (response.success) {
+        setSelectedReport(response.data);
+      }
+    } catch (error) {
+      console.error("Error loading report:", error);
     }
   };
 
@@ -286,6 +312,33 @@ function ChiefPage() {
           <p>読み込み中...</p>
         ) : !selectedSiteName ? (
           <p>日付、場所、現場名を選択してください</p>
+        ) : availableReports.length === 0 ? (
+          <p>この日付・現場の報告書が見つかりませんでした</p>
+        ) : availableReports.length > 1 && !selectedReport ? (
+          <div className="reports-list">
+            <h2>報告書を選択してください ({availableReports.length}件)</h2>
+            <ul>
+              {availableReports.map((report) => (
+                <li
+                  key={report.id}
+                  onClick={() => handleReportSelect(report.id!)}
+                  className="clickable"
+                >
+                  <div>
+                    <strong>{report.site_name}</strong> {report.site_code ? `(${report.site_code})` : ""}
+                  </div>
+                  <div className="meta">
+                    {report.report_date} - {report.location || "場所未設定"}
+                  </div>
+                  {report.staff_entries && report.staff_entries.length > 0 && (
+                    <div className="meta">
+                      スタッフ: {report.staff_entries.map((e) => e.staff_name).join(", ")}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : selectedReport ? (
           <div className="report-detail">
             <h2>報告書詳細</h2>
