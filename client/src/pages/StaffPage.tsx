@@ -33,6 +33,9 @@ function StaffPage() {
     other: false,
   });
   const [staffRoleOtherText, setStaffRoleOtherText] = useState<string>("");
+  const [staffRoleStaffText, setStaffRoleStaffText] = useState<string>("");
+  const [staffRoleActorText, setStaffRoleActorText] = useState<string>("");
+  const [staffRoleAttendText, setStaffRoleAttendText] = useState<string>("");
   const [reportContent, setReportContent] = useState<string>("");
   const [allowances, setAllowances] = useState<{
     driving: boolean;
@@ -250,9 +253,27 @@ function StaffPage() {
     const rolesArray: string[] = [];
     if (staffRoles.ad) rolesArray.push("AD");
     if (staffRoles.pa) rolesArray.push("PA");
-    if (staffRoles.staff) rolesArray.push("スタッフ");
-    if (staffRoles.actor) rolesArray.push("アクター");
-    if (staffRoles.attend) rolesArray.push("アテンド");
+    if (staffRoles.staff) {
+      if (staffRoleStaffText.trim()) {
+        rolesArray.push(`スタッフ:${staffRoleStaffText.trim()}`);
+      } else {
+        rolesArray.push("スタッフ");
+      }
+    }
+    if (staffRoles.actor) {
+      if (staffRoleActorText.trim()) {
+        rolesArray.push(`アクター:${staffRoleActorText.trim()}`);
+      } else {
+        rolesArray.push("アクター");
+      }
+    }
+    if (staffRoles.attend) {
+      if (staffRoleAttendText.trim()) {
+        rolesArray.push(`アテンド:${staffRoleAttendText.trim()}`);
+      } else {
+        rolesArray.push("アテンド");
+      }
+    }
     if (staffRoles.other && staffRoleOtherText.trim()) {
       rolesArray.push(`その他:${staffRoleOtherText.trim()}`);
     }
@@ -388,15 +409,33 @@ function StaffPage() {
             // 役割を反映
             if (detailedReport.staff_roles) {
               const roles = detailedReport.staff_roles.split(",");
+              const staffRole = roles.find((r) => r.startsWith("スタッフ:"));
+              const actorRole = roles.find((r) => r.startsWith("アクター:"));
+              const attendRole = roles.find((r) => r.startsWith("アテンド:"));
               const otherRole = roles.find((r) => r.startsWith("その他:"));
               setStaffRoles({
                 ad: roles.includes("AD"),
                 pa: roles.includes("PA"),
-                staff: roles.includes("スタッフ"),
-                actor: roles.includes("アクター"),
-                attend: roles.includes("アテンド"),
+                staff: roles.some((r) => r.startsWith("スタッフ")),
+                actor: roles.some((r) => r.startsWith("アクター")),
+                attend: roles.some((r) => r.startsWith("アテンド")),
                 other: !!otherRole,
               });
+              if (staffRole) {
+                setStaffRoleStaffText(staffRole.replace("スタッフ:", ""));
+              } else {
+                setStaffRoleStaffText("");
+              }
+              if (actorRole) {
+                setStaffRoleActorText(actorRole.replace("アクター:", ""));
+              } else {
+                setStaffRoleActorText("");
+              }
+              if (attendRole) {
+                setStaffRoleAttendText(attendRole.replace("アテンド:", ""));
+              } else {
+                setStaffRoleAttendText("");
+              }
               if (otherRole) {
                 setStaffRoleOtherText(otherRole.replace("その他:", ""));
               } else {
@@ -560,6 +599,18 @@ function StaffPage() {
                 />
                 スタッフ
               </label>
+              {staffRoles.staff && (
+                <div style={{ marginLeft: "20px", marginTop: "5px", marginBottom: "10px" }}>
+                  <input
+                    type="text"
+                    value={staffRoleStaffText}
+                    onChange={(e) => setStaffRoleStaffText(e.target.value)}
+                    disabled={loading || !canEdit}
+                    placeholder="何のポジション？"
+                    style={{ width: "100%", padding: "6px", fontSize: "14px" }}
+                  />
+                </div>
+              )}
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -571,6 +622,18 @@ function StaffPage() {
                 />
                 アクター
               </label>
+              {staffRoles.actor && (
+                <div style={{ marginLeft: "20px", marginTop: "5px", marginBottom: "10px" }}>
+                  <input
+                    type="text"
+                    value={staffRoleActorText}
+                    onChange={(e) => setStaffRoleActorText(e.target.value)}
+                    disabled={loading || !canEdit}
+                    placeholder="キャラクター名"
+                    style={{ width: "100%", padding: "6px", fontSize: "14px" }}
+                  />
+                </div>
+              )}
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -582,6 +645,18 @@ function StaffPage() {
                 />
                 アテンド
               </label>
+              {staffRoles.attend && (
+                <div style={{ marginLeft: "20px", marginTop: "5px", marginBottom: "10px" }}>
+                  <input
+                    type="text"
+                    value={staffRoleAttendText}
+                    onChange={(e) => setStaffRoleAttendText(e.target.value)}
+                    disabled={loading || !canEdit}
+                    placeholder="なんのキャラクターのアテンド"
+                    style={{ width: "100%", padding: "6px", fontSize: "14px" }}
+                  />
+                </div>
+              )}
               <label className="checkbox-label">
                 <input
                   type="checkbox"
