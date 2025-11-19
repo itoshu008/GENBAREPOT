@@ -361,6 +361,30 @@ function ChiefPage() {
     });
   };
 
+  const handleDeleteStaffEntry = async (entry: ReportStaffEntry) => {
+    if (!selectedReport?.id || !entry.id) return;
+    if (
+      !window.confirm(
+        `${entry.staff_name} さんの報告を削除しますか？`
+      )
+    )
+      return;
+
+    try {
+      await reportsApi.deleteStaffEntry(selectedReport.id, entry.id);
+      const response = await reportsApi.getReport(selectedReport.id);
+      if (response.success) {
+        setSelectedReport(response.data);
+        setMessage({ type: "success", text: "スタッフ報告を削除しました" });
+      }
+    } catch (error: any) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || "削除に失敗しました",
+      });
+    }
+  };
+
   // 写真アップロード
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedReport?.id || !e.target.files) return;
@@ -665,6 +689,7 @@ function ChiefPage() {
                       <th>仕切</th>
                       <th>倉庫</th>
                       <th>宿泊</th>
+                      <th>削除</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -738,9 +763,18 @@ function ChiefPage() {
                               }
                             />
                           </td>
+                          <td>
+                            <button
+                              className="btn btn-danger btn-small"
+                              onClick={() => handleDeleteStaffEntry(entry)}
+                              disabled={loading}
+                            >
+                              削除
+                            </button>
+                          </td>
                         </tr>
                         <tr>
-                          <td colSpan={7}>
+                          <td colSpan={8}>
                             <div className="staff-report-content">
                               {entry.report_content || "-"}
                             </div>
