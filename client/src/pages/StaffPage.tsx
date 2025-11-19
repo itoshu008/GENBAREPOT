@@ -69,35 +69,51 @@ function StaffPage() {
     }
   };
 
-  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータから）
-  const availableLocations = Array.from(
+  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータから、なければsitesから）
+  const sheetLocations = Array.from(
     new Set(
       sheetData
         .map((row) => row.location)
         .filter((l): l is string => !!l)
     )
-  ).sort((a, b) => a.localeCompare(b, "ja"));
+  );
+  
+  const sitesLocations = Array.from(
+    new Set(
+      sites
+        .map((s) => s.location)
+        .filter((l): l is string => !!l)
+    )
+  );
+  
+  // スプレッドシートにデータがある場合はそれを使用、なければsitesから取得
+  const availableLocations = (sheetLocations.length > 0 ? sheetLocations : sitesLocations)
+    .sort((a, b) => a.localeCompare(b, "ja"));
 
-  // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータから）
-  const filteredSites = selectedLocation
-    ? sheetData
-        .filter((row) => row.location === selectedLocation)
-        .map((row) => ({
-          id: undefined,
-          year: new Date(reportDate).getFullYear(),
-          month: new Date(reportDate).getMonth() + 1,
-          site_code: "",
-          site_name: row.site_name,
-          location: row.location,
-        }))
-    : sheetData.map((row) => ({
-        id: undefined,
-        year: new Date(reportDate).getFullYear(),
-        month: new Date(reportDate).getMonth() + 1,
-        site_code: "",
-        site_name: row.site_name,
-        location: row.location,
-      }));
+  // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータから、なければsitesから）
+  const filteredSites = sheetData.length > 0
+    ? (selectedLocation
+        ? sheetData
+            .filter((row) => row.location === selectedLocation)
+            .map((row) => ({
+              id: undefined,
+              year: new Date(reportDate).getFullYear(),
+              month: new Date(reportDate).getMonth() + 1,
+              site_code: "",
+              site_name: row.site_name,
+              location: row.location,
+            }))
+        : sheetData.map((row) => ({
+            id: undefined,
+            year: new Date(reportDate).getFullYear(),
+            month: new Date(reportDate).getMonth() + 1,
+            site_code: "",
+            site_name: row.site_name,
+            location: row.location,
+          })))
+    : (selectedLocation
+        ? sites.filter((s) => s.location === selectedLocation)
+        : sites);
 
   useEffect(() => {
     if (selectedSiteName) {
