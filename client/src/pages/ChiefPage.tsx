@@ -19,17 +19,6 @@ const formatStaffRoles = (roles?: string | null) => {
     .join(" / ");
 };
 
-const formatStaffRoles = (roles?: string | null) => {
-  if (!roles) return "-";
-  return roles
-    .split(",")
-    .map((role) => {
-      const [label, detail] = role.split(":");
-      return detail ? `${label}:${detail}` : label;
-    })
-    .join(" / ");
-};
-
 function ChiefPage() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
   const [availableReports, setAvailableReports] = useState<ReportWithDetails[]>([]);
