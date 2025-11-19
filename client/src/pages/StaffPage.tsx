@@ -23,13 +23,16 @@ function StaffPage() {
     staff: boolean;
     actor: boolean;
     attend: boolean;
+    other: boolean;
   }>({
     ad: false,
     pa: false,
     staff: false,
     actor: false,
     attend: false,
+    other: false,
   });
+  const [staffRoleOtherText, setStaffRoleOtherText] = useState<string>("");
   const [reportContent, setReportContent] = useState<string>("");
   const [allowances, setAllowances] = useState<{
     driving: boolean;
@@ -250,6 +253,9 @@ function StaffPage() {
     if (staffRoles.staff) rolesArray.push("スタッフ");
     if (staffRoles.actor) rolesArray.push("アクター");
     if (staffRoles.attend) rolesArray.push("アテンド");
+    if (staffRoles.other && staffRoleOtherText.trim()) {
+      rolesArray.push(`その他:${staffRoleOtherText.trim()}`);
+    }
     const staffRoleString = rolesArray.join(",");
 
     try {
@@ -379,17 +385,24 @@ function StaffPage() {
               if (detailedReport.staff_report_content) {
                 setReportContent(detailedReport.staff_report_content);
               }
-              // 役割を反映
-              if (detailedReport.staff_roles) {
-                const roles = detailedReport.staff_roles.split(",");
-                setStaffRoles({
-                  ad: roles.includes("AD"),
-                  pa: roles.includes("PA"),
-                  staff: roles.includes("スタッフ"),
-                  actor: roles.includes("アクター"),
-                  attend: roles.includes("アテンド"),
-                });
+            // 役割を反映
+            if (detailedReport.staff_roles) {
+              const roles = detailedReport.staff_roles.split(",");
+              const otherRole = roles.find((r) => r.startsWith("その他:"));
+              setStaffRoles({
+                ad: roles.includes("AD"),
+                pa: roles.includes("PA"),
+                staff: roles.includes("スタッフ"),
+                actor: roles.includes("アクター"),
+                attend: roles.includes("アテンド"),
+                other: !!otherRole,
+              });
+              if (otherRole) {
+                setStaffRoleOtherText(otherRole.replace("その他:", ""));
+              } else {
+                setStaffRoleOtherText("");
               }
+            }
               // 手当を反映
               if (detailedReport.staff_entries && detailedReport.staff_entries.length > 0) {
                 const entry = detailedReport.staff_entries.find(
@@ -569,7 +582,30 @@ function StaffPage() {
                 />
                 アテンド
               </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={staffRoles.other}
+                  onChange={(e) =>
+                    setStaffRoles({ ...staffRoles, other: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                その他
+              </label>
             </div>
+            {staffRoles.other && (
+              <div style={{ marginTop: "10px" }}>
+                <input
+                  type="text"
+                  value={staffRoleOtherText}
+                  onChange={(e) => setStaffRoleOtherText(e.target.value)}
+                  disabled={loading || !canEdit}
+                  placeholder="その他の役割を入力してください"
+                  style={{ width: "100%", padding: "8px", marginTop: "5px" }}
+                />
+              </div>
+            )}
           </div>
 
           <div className="form-group">
