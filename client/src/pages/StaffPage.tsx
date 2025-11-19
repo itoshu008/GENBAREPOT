@@ -31,6 +31,19 @@ function StaffPage() {
     attend: false,
   });
   const [reportContent, setReportContent] = useState<string>("");
+  const [allowances, setAllowances] = useState<{
+    driving: boolean;
+    laundry: boolean;
+    partition: boolean;
+    warehouse: boolean;
+    accommodation: boolean;
+  }>({
+    driving: false,
+    laundry: false,
+    partition: false,
+    warehouse: false,
+    accommodation: false,
+  });
   const [sites, setSites] = useState<Site[]>([]);
   const [sitesWithReports, setSitesWithReports] = useState<number[]>([]);
   const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
@@ -248,6 +261,23 @@ function StaffPage() {
           staff_roles: staffRoleString,
           updated_by: staffName,
         });
+        // スタッフエントリの手当情報を更新
+        if (currentReport.staff_entries && currentReport.staff_entries.length > 0) {
+          const entry = currentReport.staff_entries.find(
+            (e) => e.staff_name === staffName
+          );
+          if (entry) {
+            await reportsApi.updateStaffEntry(currentReport.id, {
+              staff_name: staffName,
+              report_content: reportContent,
+              is_driving: allowances.driving,
+              is_laundry: allowances.laundry,
+              is_partition: allowances.partition,
+              is_warehouse: allowances.warehouse,
+              is_accommodation: allowances.accommodation,
+            });
+          }
+        }
         setMessage({ type: "success", text: "保存しました" });
       } else {
         // 新規作成
@@ -263,6 +293,11 @@ function StaffPage() {
           report_content: reportContent,
           created_by: staffName,
           status: "staff_draft",
+          is_driving: allowances.driving,
+          is_laundry: allowances.laundry,
+          is_partition: allowances.partition,
+          is_warehouse: allowances.warehouse,
+          is_accommodation: allowances.accommodation,
         });
         if (response.success) {
           setMessage({ type: "success", text: "保存しました" });
@@ -335,21 +370,41 @@ function StaffPage() {
           const report = response.data.find(
             (r) => r.site_name === selectedSiteName
           );
-          if (report) {
-            setCurrentReport(report);
-            if (report.staff_report_content) {
-              setReportContent(report.staff_report_content);
-            }
-            // 役割を反映
-            if (report.staff_roles) {
-              const roles = report.staff_roles.split(",");
-              setStaffRoles({
-                ad: roles.includes("AD"),
-                pa: roles.includes("PA"),
-                staff: roles.includes("スタッフ"),
-                actor: roles.includes("アクター"),
-                attend: roles.includes("アテンド"),
-              });
+          if (report && report.id) {
+            // 詳細を取得（staff_entries含む）
+            const detailResponse = await reportsApi.getReport(report.id);
+            if (detailResponse.success) {
+              const detailedReport = detailResponse.data;
+              setCurrentReport(detailedReport);
+              if (detailedReport.staff_report_content) {
+                setReportContent(detailedReport.staff_report_content);
+              }
+              // 役割を反映
+              if (detailedReport.staff_roles) {
+                const roles = detailedReport.staff_roles.split(",");
+                setStaffRoles({
+                  ad: roles.includes("AD"),
+                  pa: roles.includes("PA"),
+                  staff: roles.includes("スタッフ"),
+                  actor: roles.includes("アクター"),
+                  attend: roles.includes("アテンド"),
+                });
+              }
+              // 手当を反映
+              if (detailedReport.staff_entries && detailedReport.staff_entries.length > 0) {
+                const entry = detailedReport.staff_entries.find(
+                  (e) => e.staff_name === staffName
+                );
+                if (entry) {
+                  setAllowances({
+                    driving: entry.is_driving || false,
+                    laundry: entry.is_laundry || false,
+                    partition: entry.is_partition || false,
+                    warehouse: entry.is_warehouse || false,
+                    accommodation: entry.is_accommodation || false,
+                  });
+                }
+              }
             }
           }
         }
@@ -513,6 +568,67 @@ function StaffPage() {
                   disabled={loading || !canEdit}
                 />
                 アテンド
+              </label>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>手当</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={allowances.driving}
+                  onChange={(e) =>
+                    setAllowances({ ...allowances, driving: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                運転
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={allowances.laundry}
+                  onChange={(e) =>
+                    setAllowances({ ...allowances, laundry: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                洗濯
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={allowances.partition}
+                  onChange={(e) =>
+                    setAllowances({ ...allowances, partition: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                仕切
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={allowances.warehouse}
+                  onChange={(e) =>
+                    setAllowances({ ...allowances, warehouse: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                倉庫
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={allowances.accommodation}
+                  onChange={(e) =>
+                    setAllowances({ ...allowances, accommodation: e.target.checked })
+                  }
+                  disabled={loading || !canEdit}
+                />
+                宿泊
               </label>
             </div>
           </div>

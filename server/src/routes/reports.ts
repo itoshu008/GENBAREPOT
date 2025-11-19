@@ -166,6 +166,11 @@ export default function reportRoutes(io: Server) {
         staff_roles,
         report_content,
         created_by,
+        is_driving,
+        is_laundry,
+        is_partition,
+        is_warehouse,
+        is_accommodation,
       } = req.body;
 
       if (!report_date || !site_name) {
@@ -259,9 +264,19 @@ export default function reportRoutes(io: Server) {
         if (staff_name && report_content) {
           await connection.execute(
             `INSERT INTO report_staff_entries (
-              report_id, staff_name, report_content
-            ) VALUES (?, ?, ?)`,
-            [reportId, staff_name, report_content]
+              report_id, staff_name, report_content,
+              is_driving, is_laundry, is_partition, is_warehouse, is_accommodation
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              reportId,
+              staff_name,
+              report_content,
+              is_driving || false,
+              is_laundry || false,
+              is_partition || false,
+              is_warehouse || false,
+              is_accommodation || false,
+            ]
           );
         }
 
@@ -468,8 +483,16 @@ export default function reportRoutes(io: Server) {
   router.post("/:id/staff-entries", async (req, res) => {
     try {
       const { id } = req.params;
-      const { staff_name, report_content, is_warehouse, is_selection, is_driving } =
-        req.body;
+      const {
+        staff_name,
+        report_content,
+        is_warehouse,
+        is_selection,
+        is_driving,
+        is_laundry,
+        is_partition,
+        is_accommodation,
+      } = req.body;
 
       if (!staff_name) {
         return res.status(400).json({ error: "staff_name is required" });
@@ -486,6 +509,7 @@ export default function reportRoutes(io: Server) {
         await pool.execute(
           `UPDATE report_staff_entries 
            SET report_content = ?, is_warehouse = ?, is_selection = ?, is_driving = ?,
+               is_laundry = ?, is_partition = ?, is_accommodation = ?,
                updated_at = CURRENT_TIMESTAMP
            WHERE report_id = ? AND staff_name = ?`,
           [
@@ -493,6 +517,9 @@ export default function reportRoutes(io: Server) {
             is_warehouse || false,
             is_selection || false,
             is_driving || false,
+            is_laundry || false,
+            is_partition || false,
+            is_accommodation || false,
             id,
             staff_name,
           ]
@@ -501,8 +528,9 @@ export default function reportRoutes(io: Server) {
         // 新規作成
         await pool.execute(
           `INSERT INTO report_staff_entries 
-           (report_id, staff_name, report_content, is_warehouse, is_selection, is_driving)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+           (report_id, staff_name, report_content, is_warehouse, is_selection, is_driving,
+            is_laundry, is_partition, is_accommodation)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             id,
             staff_name,
@@ -510,6 +538,9 @@ export default function reportRoutes(io: Server) {
             is_warehouse || false,
             is_selection || false,
             is_driving || false,
+            is_laundry || false,
+            is_partition || false,
+            is_accommodation || false,
           ]
         );
       }

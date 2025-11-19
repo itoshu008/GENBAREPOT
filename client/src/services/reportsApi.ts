@@ -50,6 +50,9 @@ export interface ReportStaffEntry {
   is_warehouse?: boolean;
   is_selection?: boolean;
   is_driving?: boolean;
+  is_laundry?: boolean;
+  is_partition?: boolean;
+  is_accommodation?: boolean;
 }
 
 export interface ReportWithDetails extends Report {
