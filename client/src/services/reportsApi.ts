@@ -180,5 +180,11 @@ export const reportsApi = {
     const response = await api.delete(`/api/reports/${id}/photos/${photoId}`);
     return response.data;
   },
+
+  // 報告書削除
+  deleteReport: async (id: number) => {
+    const response = await api.delete(`/api/reports/${id}`);
+    return response.data;
+  },
 };
 

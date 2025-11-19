@@ -44,6 +44,7 @@ function ChiefPage() {
   // 写真関連の状態
   const [photos, setPhotos] = useState<Array<{ id: number; file_name: string; file_size?: number; created_at?: string }>>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState<boolean>(false);
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
     loadSheetData();
@@ -187,6 +188,10 @@ function ChiefPage() {
       setChiefReportContent(selectedReport.chief_report_content || "");
       loadPhotos();
     }
+  }, [selectedReport]);
+
+  useEffect(() => {
+    setIsMenuOpen(false);
   }, [selectedReport]);
 
   // 写真一覧を読み込む
@@ -385,6 +390,38 @@ function ChiefPage() {
     }
   };
 
+  const handleDeleteReport = async () => {
+    if (!selectedReport?.id) return;
+    if (
+      !window.confirm(
+        "この報告書を削除しますか？（スタッフ報告や写真もすべて削除されます）"
+      )
+    ) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      await reportsApi.deleteReport(selectedReport.id);
+      setMessage({ type: "success", text: "報告書を削除しました" });
+      setSelectedReport(null);
+      setAvailableReports((prev) =>
+        prev.filter((report) => report.id !== selectedReport.id)
+      );
+      setIsMenuOpen(false);
+      await loadReportBySite();
+    } catch (error: any) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || "削除に失敗しました",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 写真アップロード
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedReport?.id || !e.target.files) return;
@@ -484,7 +521,28 @@ function ChiefPage() {
   return (
     <div className="chief-page">
       <div className="container">
-        <h1>現場報告書 - チーフ・リーダー</h1>
+        <div className="page-header">
+          <h1>現場報告書 - チーフ・リーダー</h1>
+          <div className="header-menu">
+            <button
+              className="btn btn-secondary"
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+            >
+              メニュー
+            </button>
+            {isMenuOpen && (
+              <div className="menu-dropdown">
+                <button
+                  className="menu-item danger"
+                  onClick={handleDeleteReport}
+                  disabled={!selectedReport?.id || loading}
+                >
+                  報告書を削除
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="filter-section">
           <div className="form-group">

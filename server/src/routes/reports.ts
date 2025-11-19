@@ -766,6 +766,28 @@ export default function reportRoutes(io: Server) {
     }
   });
 
+  // 報告書削除
+  router.delete("/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const [result] = (await pool.execute(
+        "DELETE FROM reports WHERE id = ?",
+        [id]
+      )) as any;
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+
+      emitReportUpdated(io, parseInt(id, 10));
+      res.json({ success: true, message: "Report deleted" });
+    } catch (error: any) {
+      console.error("Error deleting report:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return router;
 }
 
