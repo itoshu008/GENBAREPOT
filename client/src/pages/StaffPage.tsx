@@ -34,6 +34,7 @@ function StaffPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [sitesWithReports, setSitesWithReports] = useState<number[]>([]);
   const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
+  const [sheetDataLoading, setSheetDataLoading] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(
     null
@@ -58,18 +59,23 @@ function StaffPage() {
 
   // スプレッドシートから日付でデータを取得
   const loadSheetData = async () => {
+    setSheetDataLoading(true);
     try {
       const response = await sheetsApi.getSheetDataByDate(reportDate);
       if (response.success) {
         setSheetData(response.data);
+      } else {
+        setSheetData([]);
       }
     } catch (error) {
       console.warn("Error loading sheet data:", error);
       setSheetData([]);
+    } finally {
+      setSheetDataLoading(false);
     }
   };
 
-  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータから、なければsitesから）
+  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータを優先、なければsitesから）
   const sheetLocations = Array.from(
     new Set(
       sheetData
@@ -86,12 +92,15 @@ function StaffPage() {
     )
   );
   
-  // スプレッドシートにデータがある場合はそれを使用、なければsitesから取得
-  const availableLocations = (sheetLocations.length > 0 ? sheetLocations : sitesLocations)
+  // スプレッドシートのデータが取得済みで、データがある場合はそれを使用
+  // スプレッドシートのデータがまだ取得中、またはデータがない場合はsitesから取得
+  const availableLocations = (!sheetDataLoading && sheetLocations.length > 0 
+    ? sheetLocations 
+    : sitesLocations)
     .sort((a, b) => a.localeCompare(b, "ja"));
 
-  // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータから、なければsitesから）
-  const filteredSites = sheetData.length > 0
+  // 選択された場所でフィルタリングされた現場リスト（スプレッドシートのデータが取得済みでデータがある場合はそれを使用、なければsitesから）
+  const filteredSites = (!sheetDataLoading && sheetData.length > 0)
     ? (selectedLocation
         ? sheetData
             .filter((row) => row.location === selectedLocation)
