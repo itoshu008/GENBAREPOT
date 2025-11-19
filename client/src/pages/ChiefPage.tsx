@@ -207,6 +207,38 @@ function ChiefPage() {
     }
   };
 
+  const handleReportFetchError = async (error: any, reportId?: number) => {
+    if (error?.response?.status === 404) {
+      setMessage({
+        type: "info",
+        text: "この報告書は削除されました",
+      });
+      setSelectedReport(null);
+      setPhotos([]);
+      setIsMenuOpen(false);
+      setAvailableReports((prev) =>
+        prev.filter((report) => report.id !== reportId)
+      );
+    } else {
+      console.error("Error loading report:", error);
+    }
+  };
+
+  const fetchReportDetail = async (
+    reportId: number
+  ): Promise<ReportWithDetails | null> => {
+    try {
+      const response = await reportsApi.getReport(reportId);
+      if (response.success) {
+        setSelectedReport(response.data);
+        return response.data;
+      }
+    } catch (error: any) {
+      await handleReportFetchError(error, reportId);
+    }
+    return null;
+  };
+
   // 現場名で報告書を取得
   const loadReportBySite = async () => {
     if (!selectedSiteName || !dateFilter) return;
@@ -220,19 +252,14 @@ function ChiefPage() {
         site_name: selectedSiteName,
         status: "staff_submitted",
       });
-      if (response.success && response.data.length > 0) {
-        setAvailableReports(response.data);
-        // 報告書が1つだけの場合は自動選択
-        if (response.data.length === 1) {
-          const detailResponse = await reportsApi.getReport(response.data[0].id!);
-          if (detailResponse.success) {
-            setSelectedReport(detailResponse.data);
+        if (response.success && response.data.length > 0) {
+          setAvailableReports(response.data);
+          if (response.data.length === 1) {
+            await fetchReportDetail(response.data[0].id!);
+          } else {
+            setSelectedReport(null);
           }
         } else {
-          // 複数の場合は選択をリセット
-          setSelectedReport(null);
-        }
-      } else {
         setAvailableReports([]);
         setSelectedReport(null);
       }
@@ -247,36 +274,30 @@ function ChiefPage() {
 
   // 報告書を選択
   const handleReportSelect = async (reportId: number) => {
-    try {
-      const response = await reportsApi.getReport(reportId);
-      if (response.success) {
-        setSelectedReport(response.data);
-      }
-    } catch (error) {
-      console.error("Error loading report:", error);
-    }
+    await fetchReportDetail(reportId);
   };
 
   // リアルタイム更新: 選択中の報告書が更新されたら再取得
   useRealtimeReport(
     selectedReport?.id,
     async () => {
-      if (selectedReport?.id) {
-        const response = await reportsApi.getReport(selectedReport.id);
-        if (response.success) {
-          setSelectedReport(response.data);
+      const reportId = selectedReport?.id;
+      if (reportId) {
+        const data = await fetchReportDetail(reportId);
+        if (!data) {
+          await loadReportBySite();
         }
       }
     },
     async (status) => {
       // ステータス変更時も再取得
-      if (selectedReport?.id) {
-        const response = await reportsApi.getReport(selectedReport.id);
-        if (response.success) {
-          setSelectedReport(response.data);
+      const reportId = selectedReport?.id;
+      if (reportId) {
+        const data = await fetchReportDetail(reportId);
+        if (!data && selectedSiteName && dateFilter) {
+          await loadReportBySite();
         }
-        // ステータスが変更されたら報告書を再取得
-        if (selectedSiteName && dateFilter) {
+        if (data && selectedSiteName && dateFilter) {
           await loadReportBySite();
         }
       }
@@ -298,10 +319,7 @@ function ChiefPage() {
       });
       setMessage({ type: "success", text: "時間記録を更新しました" });
       // 報告書を再取得
-      const response = await reportsApi.getReport(selectedReport.id);
-      if (response.success) {
-        setSelectedReport(response.data);
-      }
+      await fetchReportDetail(selectedReport.id);
     } catch (error: any) {
       setMessage({
         type: "error",
@@ -336,12 +354,9 @@ function ChiefPage() {
         is_accommodation: payload.isAccommodation,
       });
       // 報告書を再取得
-      const response = await reportsApi.getReport(selectedReport.id);
-      if (response.success) {
-        setSelectedReport(response.data);
-      }
-    } catch (error) {
-      console.error("Error updating staff entry:", error);
+      await fetchReportDetail(selectedReport.id);
+    } catch (error: any) {
+      await handleReportFetchError(error, selectedReport.id);
     }
   };
 
@@ -377,16 +392,10 @@ function ChiefPage() {
 
     try {
       await reportsApi.deleteStaffEntry(selectedReport.id, entry.id);
-      const response = await reportsApi.getReport(selectedReport.id);
-      if (response.success) {
-        setSelectedReport(response.data);
-        setMessage({ type: "success", text: "スタッフ報告を削除しました" });
-      }
+      await fetchReportDetail(selectedReport.id);
+      setMessage({ type: "success", text: "スタッフ報告を削除しました" });
     } catch (error: any) {
-      setMessage({
-        type: "error",
-        text: error.response?.data?.error || "削除に失敗しました",
-      });
+      await handleReportFetchError(error, selectedReport.id);
     }
   };
 
