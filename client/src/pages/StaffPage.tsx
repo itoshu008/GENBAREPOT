@@ -780,7 +780,7 @@ function StaffPage() {
                 disabled={loading || !currentReport?.id}
                 className="btn btn-danger"
               >
-                チーフへ提出
+                チーフ・リーダーへ提出
               </button>
             )}
           </div>
