@@ -1,8 +1,23 @@
 import { useState, useEffect } from "react";
-import { reportsApi, ReportWithDetails } from "../services/reportsApi";
+import {
+  reportsApi,
+  ReportWithDetails,
+  ReportStaffEntry,
+} from "../services/reportsApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import "./ChiefPage.css";
+
+const formatStaffRoles = (roles?: string | null) => {
+  if (!roles) return "-";
+  return roles
+    .split(",")
+    .map((role) => {
+      const [label, detail] = role.split(":");
+      return detail ? `${label}:${detail}` : label;
+    })
+    .join(" / ");
+};
 
 function ChiefPage() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
@@ -294,18 +309,26 @@ function ChiefPage() {
 
   const handleUpdateStaffEntry = async (
     staffName: string,
-    isWarehouse: boolean,
-    isSelection: boolean,
-    isDriving: boolean
+    payload: {
+      isWarehouse: boolean;
+      isSelection: boolean;
+      isDriving: boolean;
+      isLaundry: boolean;
+      isPartition: boolean;
+      isAccommodation: boolean;
+    }
   ) => {
     if (!selectedReport?.id) return;
 
     try {
       await reportsApi.updateStaffEntry(selectedReport.id, {
         staff_name: staffName,
-        is_warehouse: isWarehouse,
-        is_selection: isSelection,
-        is_driving: isDriving,
+        is_warehouse: payload.isWarehouse,
+        is_selection: payload.isSelection,
+        is_driving: payload.isDriving,
+        is_laundry: payload.isLaundry,
+        is_partition: payload.isPartition,
+        is_accommodation: payload.isAccommodation,
       });
       // 報告書を再取得
       const response = await reportsApi.getReport(selectedReport.id);
@@ -315,6 +338,27 @@ function ChiefPage() {
     } catch (error) {
       console.error("Error updating staff entry:", error);
     }
+  };
+
+  const handleAllowanceToggle = (
+    entry: ReportStaffEntry,
+    field:
+      | "is_driving"
+      | "is_laundry"
+      | "is_partition"
+      | "is_warehouse"
+      | "is_accommodation",
+    value: boolean
+  ) => {
+    handleUpdateStaffEntry(entry.staff_name, {
+      isWarehouse: field === "is_warehouse" ? value : !!entry.is_warehouse,
+      isSelection: entry.is_selection || false,
+      isDriving: field === "is_driving" ? value : !!entry.is_driving,
+      isLaundry: field === "is_laundry" ? value : !!entry.is_laundry,
+      isPartition: field === "is_partition" ? value : !!entry.is_partition,
+      isAccommodation:
+        field === "is_accommodation" ? value : !!entry.is_accommodation,
+    });
   };
 
   // 写真アップロード
@@ -615,56 +659,83 @@ function ChiefPage() {
                   <thead>
                     <tr>
                       <th>スタッフ名</th>
-                      <th>ポジション</th>
+                      <th>役割</th>
                       <th>報告内容</th>
-                      <th>倉庫</th>
-                      <th>選択</th>
                       <th>運転</th>
+                      <th>洗濯</th>
+                      <th>仕切</th>
+                      <th>倉庫</th>
+                      <th>宿泊</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedReport.staff_entries.map((entry) => (
                       <tr key={entry.id}>
                         <td>{entry.staff_name}</td>
-                        <td>{selectedReport.staff_roles || "-"}</td>
-                        <td>{entry.report_content || "-"}</td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={entry.is_warehouse || false}
-                            onChange={(e) =>
-                              handleUpdateStaffEntry(
-                                entry.staff_name,
-                                e.target.checked,
-                                entry.is_selection || false,
-                                entry.is_driving || false
-                              )
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={entry.is_selection || false}
-                            onChange={(e) =>
-                              handleUpdateStaffEntry(
-                                entry.staff_name,
-                                entry.is_warehouse || false,
-                                e.target.checked,
-                                entry.is_driving || false
-                              )
-                            }
-                          />
+                        <td>{formatStaffRoles(selectedReport.staff_roles)}</td>
+                        <td style={{ whiteSpace: "pre-wrap" }}>
+                          {entry.report_content || "-"}
                         </td>
                         <td>
                           <input
                             type="checkbox"
                             checked={entry.is_driving || false}
                             onChange={(e) =>
-                              handleUpdateStaffEntry(
-                                entry.staff_name,
-                                entry.is_warehouse || false,
-                                entry.is_selection || false,
+                              handleAllowanceToggle(
+                                entry,
+                                "is_driving",
+                                e.target.checked
+                              )
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={entry.is_laundry || false}
+                            onChange={(e) =>
+                              handleAllowanceToggle(
+                                entry,
+                                "is_laundry",
+                                e.target.checked
+                              )
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={entry.is_partition || false}
+                            onChange={(e) =>
+                              handleAllowanceToggle(
+                                entry,
+                                "is_partition",
+                                e.target.checked
+                              )
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={entry.is_warehouse || false}
+                            onChange={(e) =>
+                              handleAllowanceToggle(
+                                entry,
+                                "is_warehouse",
+                                e.target.checked
+                              )
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={entry.is_accommodation || false}
+                            onChange={(e) =>
+                              handleAllowanceToggle(
+                                entry,
+                                "is_accommodation",
                                 e.target.checked
                               )
                             }
