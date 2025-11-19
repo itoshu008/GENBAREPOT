@@ -178,6 +178,60 @@ export default function reportRoutes(io: Server) {
       await connection.beginTransaction();
 
       try {
+        // site_idがない場合は、site_nameとsite_codeからsitesテーブルを検索
+        let finalSiteId = site_id;
+        if (!finalSiteId && site_name) {
+          const { year, month } = {
+            year: new Date(report_date).getFullYear(),
+            month: new Date(report_date).getMonth() + 1,
+          };
+
+          // 既存のsiteを検索
+          const [existingSites] = await connection.execute(
+            `SELECT id FROM sites 
+             WHERE year = ? AND month = ? AND site_name = ? 
+             LIMIT 1`,
+            [year, month, site_name]
+          ) as any[];
+
+          if (existingSites.length > 0) {
+            finalSiteId = existingSites[0].id;
+          } else {
+            // 存在しない場合は新規作成
+            const [siteResult] = await connection.execute(
+              `INSERT INTO sites (year, month, site_code, site_name, location)
+               VALUES (?, ?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE
+                 site_name = VALUES(site_name),
+                 location = VALUES(location),
+                 updated_at = CURRENT_TIMESTAMP`,
+              [year, month, finalSiteCode, site_name, location || null]
+            ) as any;
+            
+            // insertIdが取得できない場合は、再度検索（ON DUPLICATE KEY UPDATEの場合）
+            if (siteResult.insertId && siteResult.insertId > 0) {
+              finalSiteId = siteResult.insertId;
+            } else {
+              const [newSites] = await connection.execute(
+                `SELECT id FROM sites 
+                 WHERE year = ? AND month = ? AND site_code = ? AND site_name = ?
+                 LIMIT 1`,
+                [year, month, finalSiteCode, site_name]
+              ) as any[];
+              if (newSites.length > 0) {
+                finalSiteId = newSites[0].id;
+              }
+            }
+          }
+        }
+
+        if (!finalSiteId) {
+          await connection.rollback();
+          return res.status(400).json({
+            error: "site_id is required and could not be determined",
+          });
+        }
+
         // 報告書作成
         const [result] = await connection.execute(
           `INSERT INTO reports (
@@ -186,7 +240,7 @@ export default function reportRoutes(io: Server) {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, 'staff_draft', ?)`,
           [
             report_date,
-            site_id || null,
+            finalSiteId,
             finalSiteCode,
             site_name,
             location || null,
