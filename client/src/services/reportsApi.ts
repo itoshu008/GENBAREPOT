@@ -86,7 +86,13 @@ export const reportsApi = {
   },
 
   // 報告書作成
-  createReport: async (data: Partial<Report>) => {
+  createReport: async (data: Partial<Report> & {
+    is_driving?: boolean;
+    is_laundry?: boolean;
+    is_partition?: boolean;
+    is_warehouse?: boolean;
+    is_accommodation?: boolean;
+  }) => {
     const response = await api.post("/api/reports", data);
     return response.data;
   },

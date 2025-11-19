@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { reportsApi, Report } from "../services/reportsApi";
+import { reportsApi, Report, ReportWithDetails } from "../services/reportsApi";
 import { mastersApi, Site } from "../services/mastersApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
@@ -52,7 +52,7 @@ function StaffPage() {
   const [message, setMessage] = useState<{ type: string; text: string } | null>(
     null
   );
-  const [currentReport, setCurrentReport] = useState<Report | null>(null);
+  const [currentReport, setCurrentReport] = useState<ReportWithDetails | null>(null);
 
   // 選択された日付から年と月を取得
   const getYearMonthFromDate = (dateString: string) => {
