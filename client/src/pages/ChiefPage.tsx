@@ -5,7 +5,6 @@ import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import "./ChiefPage.css";
 
 function ChiefPage() {
-  const [reports, setReports] = useState<ReportWithDetails[]>([]);
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
   const [chiefName, setChiefName] = useState<string>("");
   const [dateFilter, setDateFilter] = useState<string>(
@@ -15,6 +14,7 @@ function ChiefPage() {
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
   const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [selectedSiteName, setSelectedSiteName] = useState<string>("");
 
   // 時間記録の状態
   const [meetingTime, setMeetingTime] = useState<string>("");
@@ -25,13 +25,18 @@ function ChiefPage() {
 
   useEffect(() => {
     loadSheetData();
-    loadReports();
     setSelectedLocation("");
+    setSelectedSiteName("");
+    setSelectedReport(null);
   }, [dateFilter]);
 
   useEffect(() => {
-    loadReports();
-  }, [chiefName, selectedLocation]);
+    if (selectedSiteName && dateFilter) {
+      loadReportBySite();
+    } else {
+      setSelectedReport(null);
+    }
+  }, [selectedSiteName, dateFilter]);
 
   // スプレッドシートから日付でデータを取得
   const loadSheetData = async () => {
@@ -55,6 +60,19 @@ function ChiefPage() {
     )
   ).sort((a, b) => a.localeCompare(b, "ja"));
 
+  // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータから）
+  const filteredSites = selectedLocation
+    ? sheetData
+        .filter((row) => row.location === selectedLocation)
+        .map((row) => ({
+          site_name: row.site_name,
+          location: row.location,
+        }))
+    : sheetData.map((row) => ({
+        site_name: row.site_name,
+        location: row.location,
+      }));
+
   useEffect(() => {
     if (selectedReport) {
       setMeetingTime(selectedReport.times?.meeting_time?.substring(0, 5) || "");
@@ -65,35 +83,34 @@ function ChiefPage() {
     }
   }, [selectedReport]);
 
-  const loadReports = async () => {
+  // 現場名で報告書を取得
+  const loadReportBySite = async () => {
+    if (!selectedSiteName || !dateFilter) return;
+
     setLoading(true);
     try {
       const response = await reportsApi.getReports({
         role: "chief",
         date_from: dateFilter,
         date_to: dateFilter,
-        chief_name: chiefName || undefined,
-        location: selectedLocation || undefined,
+        site_name: selectedSiteName,
         status: "staff_submitted",
       });
-      if (response.success) {
-        setReports(response.data);
-      }
-    } catch (error) {
-      console.error("Error loading reports:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReportSelect = async (reportId: number) => {
-    try {
-      const response = await reportsApi.getReport(reportId);
-      if (response.success) {
-        setSelectedReport(response.data);
+      if (response.success && response.data.length > 0) {
+        // 最初の報告書を選択
+        const report = response.data[0];
+        const detailResponse = await reportsApi.getReport(report.id!);
+        if (detailResponse.success) {
+          setSelectedReport(detailResponse.data);
+        }
+      } else {
+        setSelectedReport(null);
       }
     } catch (error) {
       console.error("Error loading report:", error);
+      setSelectedReport(null);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -115,8 +132,10 @@ function ChiefPage() {
         if (response.success) {
           setSelectedReport(response.data);
         }
-        // ステータスが変更されたら一覧も更新
-        loadReports();
+        // ステータスが変更されたら報告書を再取得
+        if (selectedSiteName && dateFilter) {
+          await loadReportBySite();
+        }
       }
     }
   );
@@ -201,8 +220,8 @@ function ChiefPage() {
       );
 
       setMessage({ type: "success", text: "営業へ提出しました" });
-      loadReports();
-      setSelectedReport(null);
+      // 報告書を再取得
+      await loadReportBySite();
     } catch (error: any) {
       setMessage({
         type: "error",
@@ -231,7 +250,10 @@ function ChiefPage() {
             <label>場所</label>
             <select
               value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
+              onChange={(e) => {
+                setSelectedLocation(e.target.value);
+                setSelectedSiteName("");
+              }}
             >
               <option value="">すべての場所</option>
               {availableLocations.map((loc) => (
@@ -242,46 +264,29 @@ function ChiefPage() {
             </select>
           </div>
           <div className="form-group">
-            <label>チーフ名</label>
-            <input
-              type="text"
-              value={chiefName}
-              onChange={(e) => setChiefName(e.target.value)}
-              placeholder="フィルタ用（空欄で全件）"
-            />
-          </div>
-          <button onClick={loadReports} className="btn btn-primary">
-            検索
-          </button>
-        </div>
-
-        <div className="reports-list">
-          <h2>提出された報告書一覧</h2>
-          {loading ? (
-            <p>読み込み中...</p>
-          ) : reports.length === 0 ? (
-            <p>報告書がありません</p>
-          ) : (
-            <ul>
-              {reports.map((report) => (
-                <li
-                  key={report.id}
-                  onClick={() => handleReportSelect(report.id!)}
-                  className={selectedReport?.id === report.id ? "active" : ""}
-                >
-                  <div>
-                    <strong>{report.site_name}</strong> ({report.site_code})
-                  </div>
-                  <div className="meta">
-                    {report.report_date} - {report.location || "場所未設定"}
-                  </div>
-                </li>
+            <label>現場名</label>
+            <select
+              value={selectedSiteName}
+              onChange={(e) => setSelectedSiteName(e.target.value)}
+              disabled={!selectedLocation}
+            >
+              <option value="">
+                {selectedLocation ? "現場を選択してください" : "まず場所を選択してください"}
+              </option>
+              {filteredSites.map((site, index) => (
+                <option key={index} value={site.site_name}>
+                  {site.site_name}
+                </option>
               ))}
-            </ul>
-          )}
+            </select>
+          </div>
         </div>
 
-        {selectedReport && (
+        {loading ? (
+          <p>読み込み中...</p>
+        ) : !selectedSiteName ? (
+          <p>日付、場所、現場名を選択してください</p>
+        ) : selectedReport ? (
           <div className="report-detail">
             <h2>報告書詳細</h2>
 
@@ -431,6 +436,8 @@ function ChiefPage() {
               </div>
             )}
           </div>
+        ) : (
+          <p>この日付・現場の報告書が見つかりませんでした</p>
         )}
       </div>
     </div>
