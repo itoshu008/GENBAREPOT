@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { reportsApi, ReportWithDetails, ReportStatus } from "../services/reportsApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport, useRealtimeRole } from "../hooks/useRealtimeReport";
@@ -11,6 +11,16 @@ function SalesPage() {
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
   const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
   const [sheetDataLoading, setSheetDataLoading] = useState<boolean>(false);
+  const formatStaffRoles = (roles?: string | null) => {
+    if (!roles) return "-";
+    return roles
+      .split(",")
+      .map((role) => {
+        const [label, detail] = role.split(":");
+        return detail ? `${label}:${detail}` : label;
+      })
+      .join(" / ");
+  };
 
   // フィルタ
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -386,33 +396,47 @@ function SalesPage() {
                 </div>
               )}
 
-              {selectedReport.staff_entries && selectedReport.staff_entries.length > 0 && (
-                <div className="staff-entries">
-                  <h3>スタッフ報告</h3>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>スタッフ名</th>
-                        <th>報告内容</th>
-                        <th>倉庫</th>
-                        <th>選択</th>
-                        <th>運転</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedReport.staff_entries.map((entry) => (
-                        <tr key={entry.id}>
-                          <td>{entry.staff_name}</td>
-                          <td>{entry.report_content || "-"}</td>
-                          <td>{entry.is_warehouse ? "✓" : "-"}</td>
-                          <td>{entry.is_selection ? "✓" : "-"}</td>
-                          <td>{entry.is_driving ? "✓" : "-"}</td>
+              {selectedReport.staff_entries &&
+                selectedReport.staff_entries.length > 0 && (
+                  <div className="staff-entries">
+                    <h3>スタッフ報告</h3>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>スタッフ名</th>
+                          <th>役割</th>
+                          <th>運転</th>
+                          <th>洗濯</th>
+                          <th>仕切</th>
+                          <th>倉庫</th>
+                          <th>宿泊</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody>
+                        {selectedReport.staff_entries.map((entry) => (
+                          <Fragment key={entry.id || entry.staff_name}>
+                            <tr>
+                              <td>{entry.staff_name}</td>
+                              <td>{formatStaffRoles(selectedReport.staff_roles)}</td>
+                              <td>{entry.is_driving ? "✓" : "-"}</td>
+                              <td>{entry.is_laundry ? "✓" : "-"}</td>
+                              <td>{entry.is_partition ? "✓" : "-"}</td>
+                              <td>{entry.is_warehouse ? "✓" : "-"}</td>
+                              <td>{entry.is_accommodation ? "✓" : "-"}</td>
+                            </tr>
+                            <tr>
+                              <td colSpan={7}>
+                                <div className="staff-report-content">
+                                  {entry.report_content || "-"}
+                                </div>
+                              </td>
+                            </tr>
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
               {selectedReport.chief_report_content && (
                 <div className="chief-report">
