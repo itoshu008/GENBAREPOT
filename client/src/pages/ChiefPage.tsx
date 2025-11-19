@@ -7,6 +7,7 @@ import "./ChiefPage.css";
 function ChiefPage() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
   const [availableReports, setAvailableReports] = useState<ReportWithDetails[]>([]);
+  const [reportsForLocation, setReportsForLocation] = useState<ReportWithDetails[]>([]);
   const [chiefName, setChiefName] = useState<string>("");
   const [dateFilter, setDateFilter] = useState<string>(
     new Date().toISOString().split("T")[0]
@@ -14,6 +15,7 @@ function ChiefPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
   const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
+  const [sheetDataLoading, setSheetDataLoading] = useState<boolean>(false);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedSiteName, setSelectedSiteName] = useState<string>("");
 
@@ -50,35 +52,86 @@ function ChiefPage() {
 
   // スプレッドシートから日付でデータを取得
   const loadSheetData = async () => {
+    setSheetDataLoading(true);
     try {
       const response = await sheetsApi.getSheetDataByDate(dateFilter);
       if (response.success) {
         setSheetData(response.data);
+      } else {
+        setSheetData([]);
       }
     } catch (error) {
       console.warn("Error loading sheet data:", error);
       setSheetData([]);
+    } finally {
+      setSheetDataLoading(false);
     }
   };
 
-  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータから）
-  const availableLocations = Array.from(
+  // 報告書から場所を取得（フォールバック用）
+  useEffect(() => {
+    const loadReportsForLocation = async () => {
+      if (!dateFilter) return;
+      try {
+        const response = await reportsApi.getReports({
+          role: "chief",
+          date_from: dateFilter,
+          date_to: dateFilter,
+          status: "staff_submitted",
+        });
+        if (response.success) {
+          setReportsForLocation(response.data);
+        }
+      } catch (error) {
+        console.warn("Error loading reports for location:", error);
+        setReportsForLocation([]);
+      }
+    };
+    loadReportsForLocation();
+  }, [dateFilter]);
+
+  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータを優先、なければ報告書から）
+  const sheetLocations = Array.from(
     new Set(
       sheetData
         .map((row) => row.location)
         .filter((l): l is string => !!l)
     )
-  ).sort((a, b) => a.localeCompare(b, "ja"));
-
-  // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータから、重複を除去）
-  const filteredSites = Array.from(
-    new Map(
-      (selectedLocation
-        ? sheetData.filter((row) => row.location === selectedLocation)
-        : sheetData
-      ).map((row) => [row.site_name, { site_name: row.site_name, location: row.location }])
-    ).values()
   );
+
+  const reportsLocations = Array.from(
+    new Set(
+      reportsForLocation
+        .map((r) => r.location)
+        .filter((l): l is string => !!l)
+    )
+  );
+
+  // スプレッドシートのデータが取得済みで、データがある場合はそれを使用
+  // スプレッドシートのデータがまだ取得中、またはデータがない場合は報告書から取得
+  const availableLocations = (!sheetDataLoading && sheetLocations.length > 0
+    ? sheetLocations
+    : reportsLocations)
+    .sort((a, b) => a.localeCompare(b, "ja"));
+
+  // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータを優先、なければ報告書から、重複を除去）
+  const filteredSites = (!sheetDataLoading && sheetData.length > 0)
+    ? Array.from(
+        new Map(
+          (selectedLocation
+            ? sheetData.filter((row) => row.location === selectedLocation)
+            : sheetData
+          ).map((row) => [row.site_name, { site_name: row.site_name, location: row.location }])
+        ).values()
+      )
+    : Array.from(
+        new Map(
+          (selectedLocation
+            ? reportsForLocation.filter((r) => r.location === selectedLocation)
+            : reportsForLocation
+          ).map((r) => [r.site_name, { site_name: r.site_name, location: r.location || "" }])
+        ).values()
+      );
 
   useEffect(() => {
     if (selectedReport) {
