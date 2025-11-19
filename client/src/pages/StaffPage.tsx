@@ -30,6 +30,7 @@ function StaffPage() {
   });
   const [reportContent, setReportContent] = useState<string>("");
   const [sites, setSites] = useState<Site[]>([]);
+  const [sitesWithReports, setSitesWithReports] = useState<number[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(
     null
@@ -41,17 +42,25 @@ function StaffPage() {
 
   useEffect(() => {
     loadSites();
+    // 日付が変更されたら場所の選択をリセット
+    setSelectedLocation("");
   }, [reportDate]);
 
-  // 利用可能な場所のリストを取得
+  // 利用可能な場所のリストを取得（その日付に報告書がある現場の場所のみ）
   const availableLocations = Array.from(
-    new Set(sites.map((s) => s.location).filter((l): l is string => !!l))
+    new Set(
+      sites
+        .filter((s) => s.id && sitesWithReports.includes(s.id))
+        .map((s) => s.location)
+        .filter((l): l is string => !!l)
+    )
   ).sort((a, b) => a.localeCompare(b, "ja"));
 
-  // 選択された場所でフィルタリングされた現場リスト
-  const filteredSites = selectedLocation
+  // 選択された場所でフィルタリングされた現場リスト（その日付に報告書がある現場のみ）
+  const filteredSites = (selectedLocation
     ? sites.filter((s) => s.location === selectedLocation)
-    : sites;
+    : sites
+  ).filter((s) => s.id && sitesWithReports.includes(s.id));
 
   useEffect(() => {
     if (selectedSiteId) {
@@ -95,7 +104,7 @@ function StaffPage() {
       });
       if (response.success) {
         // 選択された日付に関連する報告書がある現場を取得
-        let sitesWithReports: number[] = [];
+        let reportsSites: number[] = [];
         try {
           const reportsResponse = await reportsApi.getReports({
             role: "staff",
@@ -103,7 +112,7 @@ function StaffPage() {
             date_to: reportDate,
           });
           if (reportsResponse.success) {
-            sitesWithReports = reportsResponse.data
+            reportsSites = reportsResponse.data
               .map((r) => r.site_id)
               .filter((id): id is number => id !== undefined);
           }
@@ -112,11 +121,14 @@ function StaffPage() {
           console.warn("Error loading reports for sorting:", error);
         }
 
+        // その日付に報告書がある現場のIDを保存
+        setSitesWithReports(reportsSites);
+
         // ソート: 日付（報告書がある現場を優先） → 場所 → 現場名の順
         const sortedSites = [...response.data].sort((a, b) => {
           // 1. 日付でソート: 選択された日付に報告書がある現場を優先
-          const aHasReport = a.id && sitesWithReports.includes(a.id);
-          const bHasReport = b.id && sitesWithReports.includes(b.id);
+          const aHasReport = a.id && reportsSites.includes(a.id);
+          const bHasReport = b.id && reportsSites.includes(b.id);
           if (aHasReport !== bHasReport) {
             return aHasReport ? -1 : 1;
           }
