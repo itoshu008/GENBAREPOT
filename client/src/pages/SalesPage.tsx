@@ -10,6 +10,7 @@ function SalesPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
   const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
+  const [sheetDataLoading, setSheetDataLoading] = useState<boolean>(false);
 
   // フィルタ
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -33,6 +34,7 @@ function SalesPage() {
 
   // スプレッドシートから日付でデータを取得（開始日付を基準）
   const loadSheetData = async () => {
+    setSheetDataLoading(true);
     try {
       const response = await sheetsApi.getSheetDataByDate(dateFrom);
       if (response.success) {
@@ -41,17 +43,37 @@ function SalesPage() {
     } catch (error) {
       console.warn("Error loading sheet data:", error);
       setSheetData([]);
+    } finally {
+      setSheetDataLoading(false);
     }
   };
 
-  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータから）
-  const availableLocations = Array.from(
+  const sheetLocations = Array.from(
     new Set(
       sheetData
         .map((row) => row.location)
         .filter((l): l is string => !!l)
     )
+  );
+
+  const reportsLocations = Array.from(
+    new Set(
+      reports
+        .map((report) => report.location)
+        .filter((l): l is string => !!l)
+    )
+  );
+
+  const availableLocations = (
+    sheetData.length > 0
+      ? sheetLocations
+      : !sheetDataLoading
+      ? reportsLocations
+      : []
   ).sort((a, b) => a.localeCompare(b, "ja"));
+
+  const isLocationListLoading =
+    sheetDataLoading && sheetData.length === 0;
 
   useEffect(() => {
     loadReports();
@@ -260,13 +282,20 @@ function SalesPage() {
             <select
               value={location}
               onChange={(e) => setLocation(e.target.value)}
+              disabled={isLocationListLoading}
             >
-              <option value="">すべての場所</option>
-              {availableLocations.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
+              {isLocationListLoading ? (
+                <option value="">場所を読み込み中...</option>
+              ) : (
+                <>
+                  <option value="">すべての場所</option>
+                  {availableLocations.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
           <div className="form-group">
