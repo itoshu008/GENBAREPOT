@@ -464,6 +464,7 @@ function ChiefPage() {
                   <thead>
                     <tr>
                       <th>スタッフ名</th>
+                      <th>ポジション</th>
                       <th>報告内容</th>
                       <th>倉庫</th>
                       <th>選択</th>
@@ -474,6 +475,7 @@ function ChiefPage() {
                     {selectedReport.staff_entries.map((entry) => (
                       <tr key={entry.id}>
                         <td>{entry.staff_name}</td>
+                        <td>{selectedReport.staff_roles || "-"}</td>
                         <td>{entry.report_content || "-"}</td>
                         <td>
                           <input
