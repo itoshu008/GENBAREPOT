@@ -499,12 +499,6 @@ function StaffPage() {
       <div className="container">
         <div className="page-header">
           <h1>現場報告書 - スタッフ</h1>
-          <button
-            onClick={() => navigate("/chief")}
-            className="btn btn-header"
-          >
-            チーフページへ
-          </button>
         </div>
 
         <div className="form-section">
@@ -796,6 +790,15 @@ function StaffPage() {
               {message.text}
             </div>
           )}
+
+          <div style={{ marginTop: "30px", textAlign: "center" }}>
+            <button
+              onClick={() => navigate("/chief")}
+              className="btn btn-header"
+            >
+              チーフ・リーダー専用ページ
+            </button>
+          </div>
         </div>
       </div>
     </div>
