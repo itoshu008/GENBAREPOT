@@ -45,6 +45,32 @@ function ChiefPage() {
     setAvailableReports([]);
   }, [selectedLocation]);
 
+  // 場所が選択され、フィルタリングされた現場が1つしかない場合は自動選択
+  useEffect(() => {
+    if (selectedLocation && !sheetDataLoading) {
+      const filtered = (!sheetDataLoading && sheetData.length > 0)
+        ? Array.from(
+            new Map(
+              sheetData
+                .filter((row) => row.location === selectedLocation)
+                .map((row) => [row.site_name, { site_name: row.site_name, location: row.location }])
+            ).values()
+          )
+        : Array.from(
+            new Map(
+              reportsForLocation
+                .filter((r) => r.location === selectedLocation)
+                .map((r) => [r.site_name, { site_name: r.site_name, location: r.location || "" }])
+            ).values()
+          );
+      
+      // 現場名が1つしかない場合は自動選択
+      if (filtered.length === 1 && !selectedSiteName) {
+        setSelectedSiteName(filtered[0].site_name);
+      }
+    }
+  }, [selectedLocation, sheetData, sheetDataLoading, reportsForLocation]);
+
   useEffect(() => {
     if (selectedSiteName && dateFilter) {
       loadReportBySite();
