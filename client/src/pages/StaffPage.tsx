@@ -37,8 +37,14 @@ function StaffPage() {
   );
   const [currentReport, setCurrentReport] = useState<Report | null>(null);
 
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
+  // 選択された日付から年と月を取得
+  const getYearMonthFromDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+    };
+  };
 
   useEffect(() => {
     loadSites();
@@ -46,21 +52,19 @@ function StaffPage() {
     setSelectedLocation("");
   }, [reportDate]);
 
-  // 利用可能な場所のリストを取得（その日付に報告書がある現場の場所のみ）
+  // 利用可能な場所のリストを取得（その日付に関連する現場の場所）
   const availableLocations = Array.from(
     new Set(
       sites
-        .filter((s) => s.id && sitesWithReports.includes(s.id))
         .map((s) => s.location)
         .filter((l): l is string => !!l)
     )
   ).sort((a, b) => a.localeCompare(b, "ja"));
 
-  // 選択された場所でフィルタリングされた現場リスト（その日付に報告書がある現場のみ）
-  const filteredSites = (selectedLocation
+  // 選択された場所でフィルタリングされた現場リスト
+  const filteredSites = selectedLocation
     ? sites.filter((s) => s.location === selectedLocation)
-    : sites
-  ).filter((s) => s.id && sitesWithReports.includes(s.id));
+    : sites;
 
   useEffect(() => {
     if (selectedSiteId) {
@@ -98,9 +102,10 @@ function StaffPage() {
 
   const loadSites = async () => {
     try {
+      const { year, month } = getYearMonthFromDate(reportDate);
       const response = await mastersApi.getSites({
-        year: currentYear,
-        month: currentMonth,
+        year: year,
+        month: month,
       });
       if (response.success) {
         // 選択された日付に関連する報告書がある現場を取得
