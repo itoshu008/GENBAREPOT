@@ -600,14 +600,14 @@ function StaffPage() {
                 スタッフ
               </label>
               {staffRoles.staff && (
-                <div style={{ marginLeft: "20px", marginTop: "5px", marginBottom: "10px" }}>
+                <div style={{ marginTop: "10px" }}>
                   <input
                     type="text"
                     value={staffRoleStaffText}
                     onChange={(e) => setStaffRoleStaffText(e.target.value)}
                     disabled={loading || !canEdit}
                     placeholder="何のポジション？"
-                    style={{ width: "100%", padding: "6px", fontSize: "14px" }}
+                    style={{ width: "100%", padding: "8px", marginTop: "5px" }}
                   />
                 </div>
               )}
@@ -623,14 +623,14 @@ function StaffPage() {
                 アクター
               </label>
               {staffRoles.actor && (
-                <div style={{ marginLeft: "20px", marginTop: "5px", marginBottom: "10px" }}>
+                <div style={{ marginTop: "10px" }}>
                   <input
                     type="text"
                     value={staffRoleActorText}
                     onChange={(e) => setStaffRoleActorText(e.target.value)}
                     disabled={loading || !canEdit}
                     placeholder="キャラクター名"
-                    style={{ width: "100%", padding: "6px", fontSize: "14px" }}
+                    style={{ width: "100%", padding: "8px", marginTop: "5px" }}
                   />
                 </div>
               )}
@@ -646,14 +646,14 @@ function StaffPage() {
                 アテンド
               </label>
               {staffRoles.attend && (
-                <div style={{ marginLeft: "20px", marginTop: "5px", marginBottom: "10px" }}>
+                <div style={{ marginTop: "10px" }}>
                   <input
                     type="text"
                     value={staffRoleAttendText}
                     onChange={(e) => setStaffRoleAttendText(e.target.value)}
                     disabled={loading || !canEdit}
                     placeholder="なんのキャラクターのアテンド"
-                    style={{ width: "100%", padding: "6px", fontSize: "14px" }}
+                    style={{ width: "100%", padding: "8px", marginTop: "5px" }}
                   />
                 </div>
               )}
