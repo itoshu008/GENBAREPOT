@@ -499,9 +499,14 @@ function StaffPage() {
     loadExistingReport();
   }, [reportDate, selectedSiteName, staffName]);
 
+  const hasExistingEntry = currentReport?.staff_entries?.some(
+    (entry) => entry.staff_name === staffName
+  );
+
   const canEdit = currentReport
     ? currentReport.status === "staff_draft" ||
-      currentReport.status === "returned_by_sales"
+      currentReport.status === "returned_by_sales" ||
+      (currentReport.status === "staff_submitted" && !hasExistingEntry)
     : true;
 
   // リアルタイム更新: 現在の報告書が更新されたら再取得
