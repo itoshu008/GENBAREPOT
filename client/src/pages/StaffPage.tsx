@@ -768,32 +768,13 @@ function StaffPage() {
             />
           </div>
 
-          {currentReport && (
-            <div className="status-info">
-              <p>
-                ステータス: <strong>{currentReport.status}</strong>
-              </p>
-              {currentReport.status === "staff_submitted" && (
-                <p className="info">
-                  この報告書はチーフへ送信済みです。未入力のスタッフは保存すると自動でチーフに通知されます。
-                </p>
-              )}
-              {currentReport.status === "returned_by_sales" && (
-                <div className="return-reason">
-                  <p className="warning">差戻し理由:</p>
-                  <p>{currentReport.return_reason}</p>
-                </div>
-              )}
-            </div>
-          )}
-
           <div className="button-group">
             <button
               onClick={handleSave}
               disabled={loading || !canEdit}
               className="btn btn-primary"
             >
-              保存
+              チーフ・リーダーへ提出
             </button>
           </div>
 
