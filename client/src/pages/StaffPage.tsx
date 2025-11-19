@@ -55,9 +55,7 @@ function StaffPage() {
   const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
   const [sheetDataLoading, setSheetDataLoading] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
-  const [message, setMessage] = useState<{ type: string; text: string } | null>(
-    null
-  );
+  const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
   const [currentReport, setCurrentReport] = useState<ReportWithDetails | null>(null);
 
   // 選択された日付から年と月を取得
@@ -281,15 +279,16 @@ function StaffPage() {
 
     try {
       if (currentReport?.id) {
+        const reportId = currentReport.id;
         // 既存報告書に追記/更新
-        await reportsApi.updateReport(currentReport.id, {
+        await reportsApi.updateReport(reportId, {
           location: selectedSite?.location || null,
           staff_report_content: reportContent,
           staff_roles: staffRoleString,
           updated_by: staffName,
         });
 
-        await reportsApi.updateStaffEntry(currentReport.id, {
+        await reportsApi.updateStaffEntry(reportId, {
           staff_name: staffName,
           report_content: reportContent,
           is_driving: allowances.driving,
@@ -299,12 +298,13 @@ function StaffPage() {
           is_accommodation: allowances.accommodation,
         });
 
-        const refreshed = await reportsApi.getReport(currentReport.id);
+        const refreshed = await reportsApi.getReport(reportId);
         if (refreshed.success) {
           setCurrentReport(refreshed.data);
         }
 
-        setMessage({ type: "success", text: "保存しました" });
+        await submitReportToChief(reportId);
+        setMessage({ type: "success", text: "保存しました（チーフへ通知済み）" });
       } else {
         // 新規作成
         // スプレッドシートから取得したデータの場合、site_idはnull（現場名で識別）
@@ -326,7 +326,6 @@ function StaffPage() {
           is_accommodation: allowances.accommodation,
         });
         if (response.success) {
-          setMessage({ type: "success", text: "保存しました" });
           // 作成した報告書を取得
           const reportResponse = await reportsApi.getReport(response.data.id);
           if (reportResponse.success) {
@@ -335,45 +334,15 @@ function StaffPage() {
             if (reportResponse.data.location) {
               setLocation(reportResponse.data.location);
             }
+            await submitReportToChief(reportResponse.data.id);
           }
+          setMessage({ type: "success", text: "保存しました（チーフへ通知済み）" });
         }
       }
     } catch (error: any) {
       setMessage({
         type: "error",
         text: error.response?.data?.error || "保存に失敗しました",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!currentReport?.id) {
-      setMessage({ type: "error", text: "まず保存してください" });
-      return;
-    }
-
-    setLoading(true);
-    setMessage(null);
-
-    try {
-      await reportsApi.updateStatus(
-        currentReport.id,
-        "staff_submitted",
-        undefined,
-        staffName
-      );
-      setMessage({ type: "success", text: "チーフへ提出しました" });
-      // 報告書を再取得
-      const response = await reportsApi.getReport(currentReport.id);
-      if (response.success) {
-        setCurrentReport(response.data);
-      }
-    } catch (error: any) {
-      setMessage({
-        type: "error",
-        text: error.response?.data?.error || "提出に失敗しました",
       });
     } finally {
       setLoading(false);
@@ -508,6 +477,19 @@ function StaffPage() {
       currentReport.status === "returned_by_sales" ||
       (currentReport.status === "staff_submitted" && !hasExistingEntry)
     : true;
+
+  const submitReportToChief = async (reportId: number) => {
+    try {
+      await reportsApi.updateStatus(
+        reportId,
+        "staff_submitted",
+        undefined,
+        staffName || undefined
+      );
+    } catch (error) {
+      console.error("Error submitting report to chief:", error);
+    }
+  };
 
   // リアルタイム更新: 現在の報告書が更新されたら再取得
   useRealtimeReport(
@@ -792,7 +774,9 @@ function StaffPage() {
                 ステータス: <strong>{currentReport.status}</strong>
               </p>
               {currentReport.status === "staff_submitted" && (
-                <p className="info">チーフへ提出済みです。編集はできません。</p>
+                <p className="info">
+                  この報告書はチーフへ送信済みです。未入力のスタッフは保存すると自動でチーフに通知されます。
+                </p>
               )}
               {currentReport.status === "returned_by_sales" && (
                 <div className="return-reason">
@@ -811,15 +795,6 @@ function StaffPage() {
             >
               保存
             </button>
-            {canEdit && (
-              <button
-                onClick={handleSubmit}
-                disabled={loading || !currentReport?.id}
-                className="btn btn-danger"
-              >
-                チーフ・リーダーへ提出
-              </button>
-            )}
           </div>
 
           {message && (
