@@ -165,11 +165,14 @@ export default function reportRoutes(io: Server) {
         created_by,
       } = req.body;
 
-      if (!report_date || !site_id || !site_code || !site_name) {
+      if (!report_date || !site_name) {
         return res.status(400).json({
-          error: "report_date, site_id, site_code, and site_name are required",
+          error: "report_date and site_name are required",
         });
       }
+
+      // site_codeがない場合は空文字列を使用
+      const finalSiteCode = site_code || "";
 
       const connection = await pool.getConnection();
       await connection.beginTransaction();
@@ -183,8 +186,8 @@ export default function reportRoutes(io: Server) {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, 'staff_draft', ?)`,
           [
             report_date,
-            site_id,
-            site_code,
+            site_id || null,
+            finalSiteCode,
             site_name,
             location || null,
             staff_roles || null,
