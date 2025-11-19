@@ -110,36 +110,41 @@ function StaffPage() {
   );
   
   // スプレッドシートのデータが取得済みで、データがある場合はそれを使用
-  // スプレッドシートのデータがまだ取得中、またはデータがない場合はsitesから取得
-  const availableLocations = (!sheetDataLoading && sheetLocations.length > 0 
-    ? sheetLocations 
-    : sitesLocations)
-    .sort((a, b) => a.localeCompare(b, "ja"));
+  // シートが空の場合のみsitesから取得
+  const availableLocations = (sheetData.length > 0
+    ? sheetLocations
+    : !sheetDataLoading
+      ? sitesLocations
+      : []
+  ).sort((a, b) => a.localeCompare(b, "ja"));
 
   // 選択された場所でフィルタリングされた現場リスト（スプレッドシートのデータが取得済みでデータがある場合はそれを使用、なければsitesから）
-  const filteredSites = (!sheetDataLoading && sheetData.length > 0)
-    ? (selectedLocation
-        ? sheetData
-            .filter((row) => row.location === selectedLocation)
-            .map((row) => ({
+  const filteredSites =
+    sheetData.length > 0
+      ? (selectedLocation
+          ? sheetData
+              .filter((row) => row.location === selectedLocation)
+              .map((row) => ({
+                id: undefined,
+                year: new Date(reportDate).getFullYear(),
+                month: new Date(reportDate).getMonth() + 1,
+                site_code: "",
+                site_name: row.site_name,
+                location: row.location,
+              }))
+          : sheetData.map((row) => ({
               id: undefined,
               year: new Date(reportDate).getFullYear(),
               month: new Date(reportDate).getMonth() + 1,
               site_code: "",
               site_name: row.site_name,
               location: row.location,
-            }))
-        : sheetData.map((row) => ({
-            id: undefined,
-            year: new Date(reportDate).getFullYear(),
-            month: new Date(reportDate).getMonth() + 1,
-            site_code: "",
-            site_name: row.site_name,
-            location: row.location,
-          })))
-    : (selectedLocation
+            })))
+      : !sheetDataLoading
+      ? selectedLocation
         ? sites.filter((s) => s.location === selectedLocation)
-        : sites);
+        : sites
+      : [];
 
   useEffect(() => {
     if (selectedSiteName) {
@@ -234,6 +239,10 @@ function StaffPage() {
     const site = filteredSites.find((s) => s.site_name === siteName);
     setSelectedSite(site || null);
   };
+
+  const isLocationListLoading = sheetDataLoading && sheetData.length === 0;
+  const isSiteListLoading =
+    sheetDataLoading && sheetData.length === 0 && !!selectedLocation;
 
   const handleSave = async () => {
     if (!selectedSiteName || !selectedSite || !staffName) {
@@ -536,14 +545,20 @@ function StaffPage() {
             <select
               value={selectedLocation}
               onChange={(e) => setSelectedLocation(e.target.value)}
-              disabled={loading || !canEdit}
+              disabled={loading || !canEdit || isLocationListLoading}
             >
-              <option value="">すべての場所</option>
-              {availableLocations.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
+              {isLocationListLoading ? (
+                <option value="">場所を読み込み中...</option>
+              ) : (
+                <>
+                  <option value="">すべての場所</option>
+                  {availableLocations.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
 
@@ -552,16 +567,30 @@ function StaffPage() {
             <select
               value={selectedSiteName || ""}
               onChange={handleSiteChange}
-              disabled={loading || !canEdit || !selectedLocation}
+              disabled={
+                loading ||
+                !canEdit ||
+                !selectedLocation ||
+                isSiteListLoading
+              }
             >
-              <option value="">
-                {selectedLocation ? "現場を選択してください" : "まず場所を選択してください"}
-              </option>
-              {filteredSites.map((site, index) => (
-                <option key={index} value={site.site_name}>
-                  {site.site_name} {site.site_code ? `(${site.site_code})` : ""}
-                </option>
-              ))}
+              {isSiteListLoading ? (
+                <option value="">現場を読み込み中...</option>
+              ) : (
+                <>
+                  <option value="">
+                    {selectedLocation
+                      ? "現場を選択してください"
+                      : "まず場所を選択してください"}
+                  </option>
+                  {filteredSites.map((site, index) => (
+                    <option key={index} value={site.site_name}>
+                      {site.site_name}{" "}
+                      {site.site_code ? `(${site.site_code})` : ""}
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
 
