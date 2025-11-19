@@ -8,6 +8,7 @@ import { initDatabase } from "./database/connection";
 import { setupRoutes } from "./routes";
 import { setupSocketIO } from "./socket";
 import { startAutoSync } from "./services/autoSync";
+import { startPhotoCleanup } from "./services/photoCleanup";
 
 dotenv.config();
 
@@ -71,6 +72,9 @@ if (autoSyncEnabled) {
   console.log("Auto sync disabled (AUTO_SYNC_ENABLED=false)");
 }
 
+// 写真自動削除サービスを開始（1日ごとにチェック）
+const photoCleanupIntervalId = startPhotoCleanup(24);
+
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   if (process.env.NODE_ENV === "production") {
@@ -85,6 +89,10 @@ process.on("SIGTERM", () => {
   if (autoSyncIntervalId) {
     const { stopAutoSync } = require("./services/autoSync");
     stopAutoSync(autoSyncIntervalId);
+  }
+  if (photoCleanupIntervalId) {
+    const { stopPhotoCleanup } = require("./services/photoCleanup");
+    stopPhotoCleanup(photoCleanupIntervalId);
   }
   httpServer.close(() => {
     console.log("Server closed");

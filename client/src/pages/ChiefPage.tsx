@@ -29,6 +29,10 @@ function ChiefPage() {
   // 基本スタッフ報告欄の編集状態
   const [isEditingStaffReport, setIsEditingStaffReport] = useState<boolean>(false);
   const [staffReportContent, setStaffReportContent] = useState<string>("");
+  
+  // 写真関連の状態
+  const [photos, setPhotos] = useState<Array<{ id: number; file_name: string; file_size?: number; created_at?: string }>>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState<boolean>(false);
 
   useEffect(() => {
     loadSheetData();
@@ -172,8 +176,22 @@ function ChiefPage() {
       setChiefReportContent(selectedReport.chief_report_content || "");
       setStaffReportContent(selectedReport.staff_report_content || "");
       setIsEditingStaffReport(false);
+      loadPhotos();
     }
   }, [selectedReport]);
+
+  // 写真一覧を読み込む
+  const loadPhotos = async () => {
+    if (!selectedReport?.id) return;
+    try {
+      const response = await reportsApi.getPhotos(selectedReport.id);
+      if (response.success) {
+        setPhotos(response.data || []);
+      }
+    } catch (error) {
+      console.error("Error loading photos:", error);
+    }
+  };
 
   // 現場名で報告書を取得
   const loadReportBySite = async () => {
@@ -367,6 +385,64 @@ function ChiefPage() {
   const handleCancelEditStaffReport = () => {
     setStaffReportContent(selectedReport?.staff_report_content || "");
     setIsEditingStaffReport(false);
+  };
+
+  // 写真アップロード
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedReport?.id || !e.target.files) return;
+
+    const files = Array.from(e.target.files);
+    const remainingSlots = 10 - photos.length;
+    
+    if (files.length > remainingSlots) {
+      setMessage({
+        type: "error",
+        text: `写真は最大10枚までです。残り${remainingSlots}枚までアップロード可能です。`,
+      });
+      return;
+    }
+
+    setUploadingPhotos(true);
+    setMessage(null);
+
+    try {
+      const response = await reportsApi.uploadPhotos(
+        selectedReport.id,
+        files,
+        chiefName || "chief"
+      );
+      if (response.success) {
+        setMessage({ type: "success", text: response.message || "写真をアップロードしました" });
+        await loadPhotos();
+      }
+    } catch (error: any) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || "アップロードに失敗しました",
+      });
+    } finally {
+      setUploadingPhotos(false);
+      e.target.value = ""; // リセット
+    }
+  };
+
+  // 写真削除
+  const handlePhotoDelete = async (photoId: number) => {
+    if (!selectedReport?.id) return;
+    if (!window.confirm("この写真を削除しますか？")) return;
+
+    try {
+      const response = await reportsApi.deletePhoto(selectedReport.id, photoId);
+      if (response.success) {
+        setMessage({ type: "success", text: "写真を削除しました" });
+        await loadPhotos();
+      }
+    } catch (error: any) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || "削除に失敗しました",
+      });
+    }
   };
 
   const handleSubmitToSales = async () => {
@@ -613,6 +689,55 @@ function ChiefPage() {
                 rows={4}
                 placeholder="チーフとしての報告内容を記入してください"
               />
+            </div>
+
+            <div className="form-group">
+              <label>写真添付（最大10枚）</label>
+              <div style={{ marginBottom: "10px" }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handlePhotoUpload}
+                  disabled={uploadingPhotos || photos.length >= 10}
+                  style={{ marginBottom: "10px" }}
+                />
+                {photos.length >= 10 && (
+                  <p style={{ color: "#dc3545", fontSize: "14px" }}>
+                    写真は最大10枚までです
+                  </p>
+                )}
+                {photos.length > 0 && (
+                  <div style={{ marginTop: "10px" }}>
+                    <p style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                      アップロード済み写真 ({photos.length}/10):
+                    </p>
+                    <ul style={{ listStyle: "none", padding: 0 }}>
+                      {photos.map((photo) => (
+                        <li
+                          key={photo.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "5px 0",
+                            borderBottom: "1px solid #eee",
+                          }}
+                        >
+                          <span>{photo.file_name}</span>
+                          <button
+                            onClick={() => handlePhotoDelete(photo.id)}
+                            className="btn btn-danger"
+                            style={{ padding: "2px 8px", fontSize: "12px" }}
+                          >
+                            削除
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="staff-entries">

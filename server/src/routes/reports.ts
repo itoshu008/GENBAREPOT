@@ -1,5 +1,8 @@
 import { Router } from "express";
 import { Server } from "socket.io";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { pool } from "../database/connection";
 import {
   Report,
@@ -534,6 +537,200 @@ export default function reportRoutes(io: Server) {
       res.json({ success: true, message: "Staff entry deleted" });
     } catch (error: any) {
       console.error("Error deleting staff entry:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 写真アップロード用のストレージ設定
+  const uploadsDir = path.join(__dirname, "../../uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      const ext = path.extname(file.originalname);
+      cb(null, `photo-${uniqueSuffix}${ext}`);
+    },
+  });
+
+  const upload = multer({
+    storage: storage,
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB
+    },
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = /jpeg|jpg|png|gif|webp/;
+      const extname = allowedTypes.test(
+        path.extname(file.originalname).toLowerCase()
+      );
+      const mimetype = allowedTypes.test(file.mimetype);
+      if (mimetype && extname) {
+        return cb(null, true);
+      }
+      cb(new Error("画像ファイルのみアップロード可能です"));
+    },
+  });
+
+  // 写真一覧取得
+  router.get("/:id/photos", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [photos] = await pool.execute(
+        `SELECT id, file_name, file_size, mime_type, created_at, expires_at
+         FROM report_photos
+         WHERE report_id = ? AND expires_at > NOW()
+         ORDER BY created_at DESC`,
+        [id]
+      ) as any[];
+
+      res.json({ success: true, data: photos });
+    } catch (error: any) {
+      console.error("Error fetching photos:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 写真アップロード（最大10枚）
+  router.post(
+    "/:id/photos",
+    upload.array("photos", 10),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const uploadedBy = (req.body.uploaded_by as string) || "chief";
+        const files = req.files as Express.Multer.File[];
+
+        if (!files || files.length === 0) {
+          return res.status(400).json({ error: "写真が選択されていません" });
+        }
+
+        // 既存の写真数を確認
+        const [existingPhotos] = await pool.execute(
+          "SELECT COUNT(*) as count FROM report_photos WHERE report_id = ? AND expires_at > NOW()",
+          [id]
+        ) as any[];
+
+        const existingCount = existingPhotos[0]?.count || 0;
+        if (existingCount + files.length > 10) {
+          return res
+            .status(400)
+            .json({ error: "写真は最大10枚までアップロード可能です" });
+        }
+
+        // 1週間後の日時を計算
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        try {
+          const photoIds: number[] = [];
+          for (const file of files) {
+            const [result] = await connection.execute(
+              `INSERT INTO report_photos 
+               (report_id, file_name, file_path, file_size, mime_type, uploaded_by, expires_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [
+                id,
+                file.originalname,
+                file.path,
+                file.size,
+                file.mimetype,
+                uploadedBy,
+                expiresAt,
+              ]
+            ) as any[];
+            photoIds.push(result.insertId);
+          }
+
+          await connection.commit();
+          res.json({
+            success: true,
+            message: `${files.length}枚の写真をアップロードしました`,
+            data: { photoIds },
+          });
+        } catch (error) {
+          await connection.rollback();
+          // アップロードされたファイルを削除
+          for (const file of files) {
+            if (fs.existsSync(file.path)) {
+              fs.unlinkSync(file.path);
+            }
+          }
+          throw error;
+        } finally {
+          connection.release();
+        }
+      } catch (error: any) {
+        console.error("Error uploading photos:", error);
+        res.status(500).json({ error: error.message });
+      }
+    }
+  );
+
+  // 写真ダウンロード
+  router.get("/:id/photos/:photoId/download", async (req, res) => {
+    try {
+      const { id, photoId } = req.params;
+      const [photos] = await pool.execute(
+        "SELECT file_path, file_name, mime_type FROM report_photos WHERE id = ? AND report_id = ? AND expires_at > NOW()",
+        [photoId, id]
+      ) as any[];
+
+      if (photos.length === 0) {
+        return res.status(404).json({ error: "写真が見つかりません" });
+      }
+
+      const photo = photos[0];
+      if (!fs.existsSync(photo.file_path)) {
+        return res.status(404).json({ error: "ファイルが見つかりません" });
+      }
+
+      res.setHeader("Content-Type", photo.mime_type || "application/octet-stream");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${encodeURIComponent(photo.file_name)}"`
+      );
+      res.sendFile(path.resolve(photo.file_path));
+    } catch (error: any) {
+      console.error("Error downloading photo:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 写真削除
+  router.delete("/:id/photos/:photoId", async (req, res) => {
+    try {
+      const { id, photoId } = req.params;
+      const [photos] = await pool.execute(
+        "SELECT file_path FROM report_photos WHERE id = ? AND report_id = ?",
+        [photoId, id]
+      ) as any[];
+
+      if (photos.length === 0) {
+        return res.status(404).json({ error: "写真が見つかりません" });
+      }
+
+      const photo = photos[0];
+      await pool.execute(
+        "DELETE FROM report_photos WHERE id = ? AND report_id = ?",
+        [photoId, id]
+      );
+
+      // ファイルを削除
+      if (fs.existsSync(photo.file_path)) {
+        fs.unlinkSync(photo.file_path);
+      }
+
+      res.json({ success: true, message: "写真を削除しました" });
+    } catch (error: any) {
+      console.error("Error deleting photo:", error);
       res.status(500).json({ error: error.message });
     }
   });

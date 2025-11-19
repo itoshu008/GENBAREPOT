@@ -131,5 +131,45 @@ export const reportsApi = {
     );
     return response.data;
   },
+
+  // 写真一覧取得
+  getPhotos: async (id: number) => {
+    const response = await api.get(`/api/reports/${id}/photos`);
+    return response.data;
+  },
+
+  // 写真アップロード
+  uploadPhotos: async (id: number, files: File[], uploadedBy?: string) => {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("photos", file);
+    });
+    if (uploadedBy) {
+      formData.append("uploaded_by", uploadedBy);
+    }
+    const response = await api.post(`/api/reports/${id}/photos`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  },
+
+  // 写真ダウンロード
+  downloadPhoto: async (id: number, photoId: number) => {
+    const response = await api.get(
+      `/api/reports/${id}/photos/${photoId}/download`,
+      {
+        responseType: "blob",
+      }
+    );
+    return response.data;
+  },
+
+  // 写真削除
+  deletePhoto: async (id: number, photoId: number) => {
+    const response = await api.delete(`/api/reports/${id}/photos/${photoId}`);
+    return response.data;
+  },
 };
 

@@ -21,6 +21,9 @@ function SalesPage() {
   // コメント
   const [salesComment, setSalesComment] = useState<string>("");
   const [returnReason, setReturnReason] = useState<string>("");
+  
+  // 写真関連
+  const [photos, setPhotos] = useState<Array<{ id: number; file_name: string; file_size?: number; created_at?: string }>>([]);
 
   useEffect(() => {
     if (dateFrom) {
@@ -58,8 +61,43 @@ function SalesPage() {
     if (selectedReport) {
       setSalesComment(selectedReport.sales_comment || "");
       setReturnReason("");
+      loadPhotos();
     }
   }, [selectedReport]);
+
+  // 写真一覧を読み込む
+  const loadPhotos = async () => {
+    if (!selectedReport?.id) return;
+    try {
+      const response = await reportsApi.getPhotos(selectedReport.id);
+      if (response.success) {
+        setPhotos(response.data || []);
+      }
+    } catch (error) {
+      console.error("Error loading photos:", error);
+    }
+  };
+
+  // 写真ダウンロード
+  const handlePhotoDownload = async (photoId: number, fileName: string) => {
+    if (!selectedReport?.id) return;
+    try {
+      const blob = await reportsApi.downloadPhoto(selectedReport.id, photoId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error: any) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || "ダウンロードに失敗しました",
+      });
+    }
+  };
 
   const loadReports = async () => {
     setLoading(true);
@@ -351,6 +389,37 @@ function SalesPage() {
                 <div className="chief-report">
                   <h3>チーフ報告</h3>
                   <p>{selectedReport.chief_report_content}</p>
+                </div>
+              )}
+
+              {photos.length > 0 && (
+                <div className="form-group">
+                  <label>添付写真 ({photos.length}枚)</label>
+                  <div style={{ marginTop: "10px" }}>
+                    <ul style={{ listStyle: "none", padding: 0 }}>
+                      {photos.map((photo) => (
+                        <li
+                          key={photo.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "8px 0",
+                            borderBottom: "1px solid #eee",
+                          }}
+                        >
+                          <span>{photo.file_name}</span>
+                          <button
+                            onClick={() => handlePhotoDownload(photo.id, photo.file_name)}
+                            className="btn btn-primary"
+                            style={{ padding: "4px 12px", fontSize: "14px" }}
+                          >
+                            ダウンロード
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               )}
 
