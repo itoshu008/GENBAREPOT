@@ -302,3 +302,136 @@ export async function syncSheetDataWithCoordinates(sheet: Sheet): Promise<{ coun
   }
 }
 
+/**
+ * 日付でスプレッドシートからデータを取得（リアルタイム取得）
+ */
+export interface SheetRowData {
+  date: string;
+  site_name: string;
+  location: string | null;
+  staff_name: string;
+}
+
+/**
+ * 日付をYYYY-MM-DD形式に変換
+ */
+function parseDate(dateValue: string): string | null {
+  const trimmed = dateValue.trim();
+  if (!trimmed) return null;
+
+  // 日本語形式（YYYY年MM月DD日）を処理
+  const japaneseDateMatch = trimmed.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  if (japaneseDateMatch) {
+    const [, year, month, day] = japaneseDateMatch;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  // YYYY/MM/DD形式の場合
+  if (trimmed.includes("/")) {
+    const parts = trimmed.split("/");
+    if (parts.length === 3) {
+      return `${parts[0]}-${parts[1].padStart(2, "0")}-${parts[2].padStart(2, "0")}`;
+    }
+  }
+
+  // 既にYYYY-MM-DD形式の場合
+  if (trimmed.includes("-")) {
+    const parts = trimmed.split("-");
+    if (parts.length === 3) {
+      return trimmed;
+    }
+  }
+
+  // その他の形式を試す（Dateオブジェクトでパース）
+  try {
+    const parsedDate = new Date(trimmed);
+    if (!isNaN(parsedDate.getTime())) {
+      const year = parsedDate.getFullYear();
+      const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+      const day = String(parsedDate.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+  } catch (error) {
+    console.warn(`Failed to parse date: ${trimmed}`, error);
+  }
+
+  return null;
+}
+
+/**
+ * 指定された日付のスプレッドシートデータを取得
+ */
+export async function getSheetDataByDate(
+  sheet: Sheet,
+  targetDate: string
+): Promise<SheetRowData[]> {
+  if (!sheet.date_column || !sheet.site_name_column || !sheet.staff_column) {
+    throw new Error("date_column, site_name_column, and staff_column are required");
+  }
+
+  const spreadsheetId = extractSheetId(sheet.url);
+  if (!spreadsheetId) {
+    throw new Error("Invalid Google Sheets URL");
+  }
+
+  // 座標から列インデックスを計算
+  const startRow = sheet.start_row || 2;
+  const dateCol = sheet.date_column.toUpperCase();
+  const siteNameCol = sheet.site_name_column.toUpperCase();
+  const locationCol = sheet.location_column?.toUpperCase() || null;
+  const staffCol = sheet.staff_column.toUpperCase();
+
+  // データを取得（Google Sheets API優先、フォールバックでCSV）
+  const rows = await fetchSheetData(sheet.url, dateCol, siteNameCol, locationCol, staffCol, startRow);
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const dateColIdx = columnToIndex(dateCol);
+  const siteNameColIdx = columnToIndex(siteNameCol);
+  const locationColIdx = locationCol ? columnToIndex(locationCol) : -1;
+  const staffColIdx = columnToIndex(staffCol);
+
+  // データ行を処理
+  let dataRows = rows;
+  // CSVの場合は、範囲指定ができないので、手動でスライス
+  if (!process.env.GOOGLE_SHEETS_KEY_FILE || process.env.GOOGLE_SHEETS_KEY_FILE.trim() === "") {
+    const dataStartRow = startRow - 1;
+    dataRows = rows.slice(dataStartRow);
+  }
+
+  const result: SheetRowData[] = [];
+
+  for (const row of dataRows) {
+    // 座標から値を取得
+    const dateValue = row[dateColIdx]?.toString().trim() || "";
+    const siteNameValue = row[siteNameColIdx]?.toString().trim() || "";
+    const locationValue = locationColIdx >= 0 ? (row[locationColIdx]?.toString().trim() || null) : null;
+    const staffValue = row[staffColIdx]?.toString().trim() || "";
+
+    // 空欄はスキップ
+    if (!dateValue || !siteNameValue || !staffValue) {
+      continue;
+    }
+
+    // 日付をYYYY-MM-DD形式に変換
+    const reportDate = parseDate(dateValue);
+    if (!reportDate) {
+      continue;
+    }
+
+    // 指定された日付と一致する行のみを返す
+    if (reportDate === targetDate) {
+      result.push({
+        date: reportDate,
+        site_name: siteNameValue,
+        location: locationValue,
+        staff_name: staffValue,
+      });
+    }
+  }
+
+  return result;
+}
+

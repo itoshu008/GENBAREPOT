@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { reportsApi, Report } from "../services/reportsApi";
 import { mastersApi, Site } from "../services/mastersApi";
+import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import "./StaffPage.css";
 
@@ -12,6 +13,7 @@ function StaffPage() {
   );
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
+  const [selectedSiteName, setSelectedSiteName] = useState<string>("");
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
   const [location, setLocation] = useState<string>("");
   const [staffName, setStaffName] = useState<string>("");
@@ -31,6 +33,7 @@ function StaffPage() {
   const [reportContent, setReportContent] = useState<string>("");
   const [sites, setSites] = useState<Site[]>([]);
   const [sitesWithReports, setSitesWithReports] = useState<number[]>([]);
+  const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(
     null
@@ -47,28 +50,58 @@ function StaffPage() {
   };
 
   useEffect(() => {
+    loadSheetData();
     loadSites();
     // 日付が変更されたら場所の選択をリセット
     setSelectedLocation("");
   }, [reportDate]);
 
-  // 利用可能な場所のリストを取得（その日付に関連する現場の場所）
+  // スプレッドシートから日付でデータを取得
+  const loadSheetData = async () => {
+    try {
+      const response = await sheetsApi.getSheetDataByDate(reportDate);
+      if (response.success) {
+        setSheetData(response.data);
+      }
+    } catch (error) {
+      console.warn("Error loading sheet data:", error);
+      setSheetData([]);
+    }
+  };
+
+  // 利用可能な場所のリストを取得（スプレッドシートから取得したデータから）
   const availableLocations = Array.from(
     new Set(
-      sites
-        .map((s) => s.location)
+      sheetData
+        .map((row) => row.location)
         .filter((l): l is string => !!l)
     )
   ).sort((a, b) => a.localeCompare(b, "ja"));
 
-  // 選択された場所でフィルタリングされた現場リスト
+  // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータから）
   const filteredSites = selectedLocation
-    ? sites.filter((s) => s.location === selectedLocation)
-    : sites;
+    ? sheetData
+        .filter((row) => row.location === selectedLocation)
+        .map((row) => ({
+          id: undefined,
+          year: new Date(reportDate).getFullYear(),
+          month: new Date(reportDate).getMonth() + 1,
+          site_code: "",
+          site_name: row.site_name,
+          location: row.location,
+        }))
+    : sheetData.map((row) => ({
+        id: undefined,
+        year: new Date(reportDate).getFullYear(),
+        month: new Date(reportDate).getMonth() + 1,
+        site_code: "",
+        site_name: row.site_name,
+        location: row.location,
+      }));
 
   useEffect(() => {
-    if (selectedSiteId) {
-      const site = filteredSites.find((s) => s.id === selectedSiteId);
+    if (selectedSiteName) {
+      const site = filteredSites.find((s) => s.site_name === selectedSiteName);
       setSelectedSite(site || null);
       // 現場が選択されたら場所を自動入力
       if (site?.location) {
@@ -77,28 +110,28 @@ function StaffPage() {
     } else {
       setSelectedSite(null);
     }
-  }, [selectedSiteId, filteredSites]);
+  }, [selectedSiteName, filteredSites]);
 
   // 場所が変更されたら現場選択をリセット、または自動選択
   useEffect(() => {
     if (selectedLocation) {
-      const filtered = sites.filter((s) => s.location === selectedLocation);
+      const filtered = filteredSites.filter((s) => s.location === selectedLocation);
       // 該当する現場が1つだけなら自動選択
       if (filtered.length === 1) {
         const site = filtered[0];
-        setSelectedSiteId(site.id || null);
+        setSelectedSiteName(site.site_name);
         setSelectedSite(site);
       } else {
         // 複数または0件の場合はリセット
-        setSelectedSiteId(null);
+        setSelectedSiteName("");
         setSelectedSite(null);
       }
     } else {
       // 場所が未選択の場合はリセット
-      setSelectedSiteId(null);
+      setSelectedSiteName("");
       setSelectedSite(null);
     }
-  }, [selectedLocation, sites]);
+  }, [selectedLocation, filteredSites]);
 
   const loadSites = async () => {
     try {
@@ -154,14 +187,14 @@ function StaffPage() {
   };
 
   const handleSiteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const siteId = parseInt(e.target.value);
-    setSelectedSiteId(siteId);
-    const site = filteredSites.find((s) => s.id === siteId);
+    const siteName = e.target.value;
+    setSelectedSiteName(siteName);
+    const site = filteredSites.find((s) => s.site_name === siteName);
     setSelectedSite(site || null);
   };
 
   const handleSave = async () => {
-    if (!selectedSiteId || !selectedSite || !staffName) {
+    if (!selectedSiteName || !selectedSite || !staffName) {
       setMessage({
         type: "error",
         text: "日付、現場、スタッフ名を入力してください",
@@ -193,12 +226,13 @@ function StaffPage() {
         setMessage({ type: "success", text: "保存しました" });
       } else {
         // 新規作成
+        // スプレッドシートから取得したデータの場合、site_idはnull（現場名で識別）
         const response = await reportsApi.createReport({
           report_date: reportDate,
-          site_id: selectedSiteId,
-          site_code: selectedSite.site_code,
-          site_name: selectedSite.site_name,
-          location: selectedSite.location || null,
+          site_id: selectedSite?.id || null,
+          site_code: selectedSite?.site_code || "",
+          site_name: selectedSite?.site_name || "",
+          location: selectedSite?.location || null,
           staff_name: staffName,
           staff_roles: staffRoleString,
           report_content: reportContent,
@@ -263,7 +297,7 @@ function StaffPage() {
   // 既存の報告書を読み込む
   useEffect(() => {
     const loadExistingReport = async () => {
-      if (!reportDate || !selectedSiteId || !staffName) return;
+      if (!reportDate || !selectedSiteName || !staffName) return;
       
       try {
         const response = await reportsApi.getReports({
@@ -274,7 +308,7 @@ function StaffPage() {
         });
         if (response.success && response.data.length > 0) {
           const report = response.data.find(
-            (r) => r.site_id === selectedSiteId
+            (r) => r.site_name === selectedSiteName
           );
           if (report) {
             setCurrentReport(report);
@@ -299,7 +333,7 @@ function StaffPage() {
       }
     };
     loadExistingReport();
-  }, [reportDate, selectedSiteId, staffName]);
+  }, [reportDate, selectedSiteName, staffName]);
 
   const canEdit = currentReport
     ? currentReport.status === "staff_draft" ||
@@ -371,16 +405,16 @@ function StaffPage() {
           <div className="form-group">
             <label>現場名</label>
             <select
-              value={selectedSiteId || ""}
+              value={selectedSiteName || ""}
               onChange={handleSiteChange}
               disabled={loading || !canEdit || !selectedLocation}
             >
               <option value="">
                 {selectedLocation ? "現場を選択してください" : "まず場所を選択してください"}
               </option>
-              {filteredSites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.site_name} ({site.site_code})
+              {filteredSites.map((site, index) => (
+                <option key={index} value={site.site_name}>
+                  {site.site_name} {site.site_code ? `(${site.site_code})` : ""}
                 </option>
               ))}
             </select>

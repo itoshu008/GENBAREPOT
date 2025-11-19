@@ -3,7 +3,7 @@ import { Server } from "socket.io";
 import { pool } from "../database/connection";
 import { Sheet, SheetType } from "../types/sheets";
 import { syncSheetData } from "../services/csvSync";
-import { syncSheetDataWithCoordinates } from "../services/sheetSync";
+import { syncSheetDataWithCoordinates, getSheetDataByDate } from "../services/sheetSync";
 
 const router = Router();
 
@@ -200,6 +200,43 @@ export default function sheetRoutes(io: Server) {
       res.json({ success: true, message: "Sheet deleted" });
     } catch (error: any) {
       console.error("Error deleting sheet:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 日付でスプレッドシートからデータを取得
+  router.get("/by-date", async (req, res) => {
+    try {
+      const { date } = req.query;
+
+      if (!date || typeof date !== "string") {
+        return res.status(400).json({
+          error: "date query parameter is required",
+        });
+      }
+
+      // アクティブなスプレッドシートを取得（座標指定があるもの）
+      const [sheets] = await pool.execute(
+        `SELECT * FROM sheets 
+         WHERE is_active = 1 
+         AND date_column IS NOT NULL 
+         AND site_name_column IS NOT NULL 
+         AND staff_column IS NOT NULL
+         ORDER BY target_year DESC, target_month DESC, created_at DESC`,
+        []
+      ) as any[];
+
+      if (sheets.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      // 最初のアクティブなシートからデータを取得
+      const sheet = sheets[0];
+      const data = await getSheetDataByDate(sheet, date);
+
+      res.json({ success: true, data });
+    } catch (error: any) {
+      console.error("Error fetching sheet data by date:", error);
       res.status(500).json({ error: error.message });
     }
   });

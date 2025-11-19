@@ -19,6 +19,13 @@ export interface Sheet {
   updated_at?: string;
 }
 
+export interface SheetRowData {
+  date: string;
+  site_name: string;
+  location: string | null;
+  staff_name: string;
+}
+
 export const sheetsApi = {
   // スプレッドシートURL一覧取得
   getSheets: async (params?: {
@@ -54,6 +61,12 @@ export const sheetsApi = {
   // CSV同期実行
   syncSheet: async (id: number) => {
     const response = await api.post(`/api/sheets/${id}/sync`);
+    return response.data;
+  },
+
+  // 日付でスプレッドシートからデータを取得
+  getSheetDataByDate: async (date: string): Promise<{ success: boolean; data: SheetRowData[] }> => {
+    const response = await api.get("/api/sheets/by-date", { params: { date } });
     return response.data;
   },
 };
