@@ -281,30 +281,29 @@ function StaffPage() {
 
     try {
       if (currentReport?.id) {
-        // 更新
+        // 既存報告書に追記/更新
         await reportsApi.updateReport(currentReport.id, {
           location: selectedSite?.location || null,
           staff_report_content: reportContent,
           staff_roles: staffRoleString,
           updated_by: staffName,
         });
-        // スタッフエントリの手当情報を更新
-        if (currentReport.staff_entries && currentReport.staff_entries.length > 0) {
-          const entry = currentReport.staff_entries.find(
-            (e) => e.staff_name === staffName
-          );
-          if (entry) {
-            await reportsApi.updateStaffEntry(currentReport.id, {
-              staff_name: staffName,
-              report_content: reportContent,
-              is_driving: allowances.driving,
-              is_laundry: allowances.laundry,
-              is_partition: allowances.partition,
-              is_warehouse: allowances.warehouse,
-              is_accommodation: allowances.accommodation,
-            });
-          }
+
+        await reportsApi.updateStaffEntry(currentReport.id, {
+          staff_name: staffName,
+          report_content: reportContent,
+          is_driving: allowances.driving,
+          is_laundry: allowances.laundry,
+          is_partition: allowances.partition,
+          is_warehouse: allowances.warehouse,
+          is_accommodation: allowances.accommodation,
+        });
+
+        const refreshed = await reportsApi.getReport(currentReport.id);
+        if (refreshed.success) {
+          setCurrentReport(refreshed.data);
         }
+
         setMessage({ type: "success", text: "保存しました" });
       } else {
         // 新規作成
@@ -384,67 +383,68 @@ function StaffPage() {
   // 既存の報告書を読み込む
   useEffect(() => {
     const loadExistingReport = async () => {
-      if (!reportDate || !selectedSiteName || !staffName) return;
-      
+      if (!reportDate || !selectedSiteName) {
+        setCurrentReport(null);
+        return;
+      }
+
       try {
-        // 同日の別現場でも提出可能にするため、site_nameも指定してフィルタリング
         const response = await reportsApi.getReports({
-          role: "staff",
           date_from: reportDate,
           date_to: reportDate,
-          staff_name: staffName,
-          site_name: selectedSiteName, // 現場名も指定して、同日の別現場で同じ人が提出可能にする
+          site_name: selectedSiteName,
         });
+
         if (response.success && response.data.length > 0) {
-          // site_nameでフィルタリング済みなので、最初の1件を取得
           const report = response.data[0];
-          if (report && report.id) {
-            // 詳細を取得（staff_entries含む）
+          if (report?.id) {
             const detailResponse = await reportsApi.getReport(report.id);
             if (detailResponse.success) {
               const detailedReport = detailResponse.data;
               setCurrentReport(detailedReport);
+
               if (detailedReport.staff_report_content) {
                 setReportContent(detailedReport.staff_report_content);
-              }
-            // 役割を反映
-            if (detailedReport.staff_roles) {
-              const roles = detailedReport.staff_roles.split(",");
-              const staffRole = roles.find((r) => r.startsWith("スタッフ:"));
-              const actorRole = roles.find((r) => r.startsWith("アクター:"));
-              const attendRole = roles.find((r) => r.startsWith("アテンド:"));
-              const otherRole = roles.find((r) => r.startsWith("その他:"));
-              setStaffRoles({
-                ad: roles.includes("AD"),
-                pa: roles.includes("PA"),
-                staff: roles.some((r) => r.startsWith("スタッフ")),
-                actor: roles.some((r) => r.startsWith("アクター")),
-                attend: roles.some((r) => r.startsWith("アテンド")),
-                other: !!otherRole,
-              });
-              if (staffRole) {
-                setStaffRoleStaffText(staffRole.replace("スタッフ:", ""));
               } else {
+                setReportContent("");
+              }
+
+              if (detailedReport.staff_roles) {
+                const roles = detailedReport.staff_roles.split(",");
+                const staffRole = roles.find((r) => r.startsWith("スタッフ:"));
+                const actorRole = roles.find((r) => r.startsWith("アクター:"));
+                const attendRole = roles.find((r) => r.startsWith("アテンド:"));
+                const otherRole = roles.find((r) => r.startsWith("その他:"));
+
+                setStaffRoles({
+                  ad: roles.includes("AD"),
+                  pa: roles.includes("PA"),
+                  staff: roles.some((r) => r.startsWith("スタッフ")),
+                  actor: roles.some((r) => r.startsWith("アクター")),
+                  attend: roles.some((r) => r.startsWith("アテンド")),
+                  other: !!otherRole,
+                });
+
+                setStaffRoleStaffText(staffRole ? staffRole.replace("スタッフ:", "") : "");
+                setStaffRoleActorText(actorRole ? actorRole.replace("アクター:", "") : "");
+                setStaffRoleAttendText(attendRole ? attendRole.replace("アテンド:", "") : "");
+                setStaffRoleOtherText(otherRole ? otherRole.replace("その他:", "") : "");
+              } else {
+                setStaffRoles({
+                  ad: false,
+                  pa: false,
+                  staff: false,
+                  actor: false,
+                  attend: false,
+                  other: false,
+                });
                 setStaffRoleStaffText("");
-              }
-              if (actorRole) {
-                setStaffRoleActorText(actorRole.replace("アクター:", ""));
-              } else {
                 setStaffRoleActorText("");
-              }
-              if (attendRole) {
-                setStaffRoleAttendText(attendRole.replace("アテンド:", ""));
-              } else {
                 setStaffRoleAttendText("");
-              }
-              if (otherRole) {
-                setStaffRoleOtherText(otherRole.replace("その他:", ""));
-              } else {
                 setStaffRoleOtherText("");
               }
-            }
-              // 手当を反映
-              if (detailedReport.staff_entries && detailedReport.staff_entries.length > 0) {
+
+              if (staffName && detailedReport.staff_entries) {
                 const entry = detailedReport.staff_entries.find(
                   (e) => e.staff_name === staffName
                 );
@@ -456,13 +456,44 @@ function StaffPage() {
                     warehouse: entry.is_warehouse || false,
                     accommodation: entry.is_accommodation || false,
                   });
+                  setReportContent(entry.report_content || "");
+                } else {
+                  setAllowances({
+                    driving: false,
+                    laundry: false,
+                    partition: false,
+                    warehouse: false,
+                    accommodation: false,
+                  });
+                  setReportContent("");
                 }
+              } else {
+                setAllowances({
+                  driving: false,
+                  laundry: false,
+                  partition: false,
+                  warehouse: false,
+                  accommodation: false,
+                });
+                setReportContent("");
               }
             }
+          } else {
+            setCurrentReport(null);
           }
+        } else {
+          setCurrentReport(null);
+          setReportContent("");
+          setAllowances({
+            driving: false,
+            laundry: false,
+            partition: false,
+            warehouse: false,
+            accommodation: false,
+          });
         }
       } catch (error) {
-        // エラーは無視
+        setCurrentReport(null);
       }
     };
     loadExistingReport();
