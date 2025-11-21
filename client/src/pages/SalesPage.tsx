@@ -5,6 +5,11 @@ import { useRealtimeReport, useRealtimeRole } from "../hooks/useRealtimeReport";
 import BackButton from "../components/BackButton";
 import "./SalesPage.css";
 
+const normalizeName = (name?: string | null) =>
+  (name || "").replace(/[\s\u3000]/g, "").toLowerCase();
+const makeAssignmentKey = (date?: string | null, site?: string | null) =>
+  `${date || ""}|${(site || "").trim()}`;
+
 function SalesPage() {
   const [reports, setReports] = useState<ReportWithDetails[]>([]);
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
@@ -15,6 +20,7 @@ function SalesPage() {
   const [showStaffPicker, setShowStaffPicker] = useState<boolean>(false);
   const [staffOptionsLoading, setStaffOptionsLoading] = useState<boolean>(false);
   const [staffOptionsError, setStaffOptionsError] = useState<string | null>(null);
+  const [sheetAssignments, setSheetAssignments] = useState<Record<string, string>>({});
   const formatStaffRoles = (roles?: string | null) => {
     if (!roles) return "-";
     return roles
@@ -34,24 +40,26 @@ function SalesPage() {
   const [photos, setPhotos] = useState<Array<{ id: number; file_name: string; file_size?: number; created_at?: string }>>([]);
 
   const deriveStaffOptions = (data: ReportWithDetails[]) => {
-    return Array.from(
-      new Set(
-        data.flatMap((report) => {
-          const names: string[] = [];
-          report.staff_entries?.forEach((entry) => {
-            if (entry.staff_name) {
-              names.push(entry.staff_name.trim());
-            }
-          });
-          if (report.created_by) {
-            names.push(report.created_by.trim());
+    const unique = new Map<string, string>();
+    data.forEach((report) => {
+      report.staff_entries?.forEach((entry) => {
+        if (entry.staff_name) {
+          const cleaned = entry.staff_name.trim();
+          const normalized = normalizeName(cleaned);
+          if (normalized && !unique.has(normalized)) {
+            unique.set(normalized, cleaned);
           }
-          return names;
-        })
-      )
-    )
-      .filter((name): name is string => typeof name === "string" && name.length > 0)
-      .sort((a, b) => a.localeCompare(b, "ja"));
+        }
+      });
+      if (report.created_by) {
+        const cleaned = report.created_by.trim();
+        const normalized = normalizeName(cleaned);
+        if (normalized && !unique.has(normalized)) {
+          unique.set(normalized, cleaned);
+        }
+      }
+    });
+    return Array.from(unique.values()).sort((a, b) => a.localeCompare(b, "ja"));
   };
 
   useEffect(() => {
@@ -116,6 +124,7 @@ function SalesPage() {
             setStaffOptions(fallback);
           }
         }
+        await loadSheetAssignments(data);
       }
     } catch (error) {
       console.error("Error loading reports:", error);
@@ -130,7 +139,17 @@ function SalesPage() {
     try {
       const response = await sheetsApi.getStaffNames();
       if (response.success && Array.isArray(response.data) && response.data.length > 0) {
-        setStaffOptions(response.data);
+        const unique = new Map<string, string>();
+        response.data.forEach((name) => {
+          if (typeof name === "string") {
+            const cleaned = name.trim();
+            const normalized = normalizeName(cleaned);
+            if (normalized && !unique.has(normalized)) {
+              unique.set(normalized, cleaned);
+            }
+          }
+        });
+        setStaffOptions(Array.from(unique.values()).sort((a, b) => a.localeCompare(b, "ja")));
       } else {
         const fallback = deriveStaffOptions(reports);
         setStaffOptions(fallback);
@@ -145,6 +164,38 @@ function SalesPage() {
     }
   };
 
+  const loadSheetAssignments = async (reportList: ReportWithDetails[]) => {
+    const uniqueDates = Array.from(
+      new Set(
+        reportList
+          .map((report) => report.report_date)
+          .filter((date): date is string => typeof date === "string" && date.length > 0)
+      )
+    );
+
+    const assignmentMap: Record<string, string> = {};
+
+    for (const date of uniqueDates) {
+      try {
+        const response = await sheetsApi.getSheetDataByDate(date);
+        if (response.success && Array.isArray(response.data)) {
+          response.data.forEach((row) => {
+            if (row.date && row.site_name && row.staff_name) {
+              const key = makeAssignmentKey(row.date, row.site_name);
+              if (key) {
+                assignmentMap[key] = row.staff_name.trim();
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.error(`Error loading sheet assignments for ${date}:`, error);
+      }
+    }
+
+    setSheetAssignments(assignmentMap);
+  };
+
   const handleReportSelect = async (reportId: number) => {
     try {
       const response = await reportsApi.getReport(reportId);
@@ -157,11 +208,15 @@ function SalesPage() {
   };
 
   const reportHasStaff = (report: ReportWithDetails, staff: string) => {
-    if (!staff) return false;
+    const target = normalizeName(staff);
+    if (!target) return false;
     return (
       (report.staff_entries &&
-        report.staff_entries.some((entry) => entry.staff_name?.trim() === staff)) ||
-      report.created_by?.trim() === staff
+        report.staff_entries.some((entry) => normalizeName(entry.staff_name) === target)) ||
+      normalizeName(report.created_by) === target ||
+      normalizeName(
+        sheetAssignments[makeAssignmentKey(report.report_date, report.site_name)]
+      ) === target
     );
   };
 
