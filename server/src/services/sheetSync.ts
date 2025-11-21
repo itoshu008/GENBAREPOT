@@ -435,3 +435,60 @@ export async function getSheetDataByDate(
   return result;
 }
 
+/**
+ * スプレッドシートから全営業担当（スタッフ）名を取得
+ */
+export async function getSheetStaffNames(sheet: Sheet): Promise<string[]> {
+  if (!sheet.date_column || !sheet.site_name_column || !sheet.staff_column) {
+    throw new Error("date_column, site_name_column, and staff_column are required");
+  }
+
+  const startRow = sheet.start_row || 2;
+  const dateCol = sheet.date_column.toUpperCase();
+  const siteNameCol = sheet.site_name_column.toUpperCase();
+  const locationCol = sheet.location_column?.toUpperCase() || null;
+  const staffCol = sheet.staff_column.toUpperCase();
+
+  const rows = await fetchSheetData(sheet.url, dateCol, siteNameCol, locationCol, staffCol, startRow);
+  if (rows.length === 0) {
+    return [];
+  }
+
+  let dataRows = rows;
+  if (!process.env.GOOGLE_SHEETS_KEY_FILE || process.env.GOOGLE_SHEETS_KEY_FILE.trim() === "") {
+    const dataStartRow = startRow - 1;
+    dataRows = rows.slice(dataStartRow);
+  }
+
+  const indices = [
+    columnToIndex(dateCol),
+    columnToIndex(siteNameCol),
+    columnToIndex(staffCol),
+  ];
+  if (locationCol) {
+    indices.push(columnToIndex(locationCol));
+  }
+  const minColIdx = Math.min(...indices);
+  const staffColIdx = columnToIndex(staffCol);
+  const relativeStaffIdx = staffColIdx - minColIdx;
+
+  const names = new Set<string>();
+
+  for (const row of dataRows) {
+    let cellValue: string | undefined;
+
+    if (relativeStaffIdx >= 0 && relativeStaffIdx < row.length) {
+      cellValue = row[relativeStaffIdx];
+    } else if (staffColIdx >= 0 && staffColIdx < row.length) {
+      cellValue = row[staffColIdx];
+    }
+
+    const staffValue = cellValue?.toString().trim();
+    if (staffValue) {
+      names.add(staffValue);
+    }
+  }
+
+  return Array.from(names).sort((a, b) => a.localeCompare(b, "ja"));
+}
+

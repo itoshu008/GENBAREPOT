@@ -70,5 +70,11 @@ export const sheetsApi = {
     const response = await api.get("/api/sheets/by-date", { params: { date } });
     return response.data;
   },
+
+  // 営業担当（スタッフ）一覧を取得
+  getStaffNames: async (): Promise<{ success: boolean; data: string[] }> => {
+    const response = await api.get("/api/sheets/staffs");
+    return response.data;
+  },
 };
 

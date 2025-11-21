@@ -3,7 +3,11 @@ import { Server } from "socket.io";
 import { pool } from "../database/connection";
 import { Sheet, SheetType } from "../types/sheets";
 import { syncSheetData } from "../services/csvSync";
-import { syncSheetDataWithCoordinates, getSheetDataByDate } from "../services/sheetSync";
+import {
+  syncSheetDataWithCoordinates,
+  getSheetDataByDate,
+  getSheetStaffNames,
+} from "../services/sheetSync";
 
 const router = Router();
 
@@ -238,6 +242,32 @@ export default function sheetRoutes(io: Server) {
     } catch (error: any) {
       console.error("Error fetching sheet data by date:", error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 営業担当（スタッフ）一覧を取得
+  router.get("/staffs", async (_req, res) => {
+    try {
+      const [sheets] = await pool.execute(
+        `SELECT * FROM sheets 
+         WHERE is_active = 1 
+         AND date_column IS NOT NULL 
+         AND site_name_column IS NOT NULL 
+         AND staff_column IS NOT NULL
+         ORDER BY target_year DESC, target_month DESC, created_at DESC`,
+        []
+      ) as any[];
+
+      if (sheets.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      const sheet = sheets[0];
+      const names = await getSheetStaffNames(sheet);
+      res.json({ success: true, data: names });
+    } catch (error: any) {
+      console.error("Error fetching staff names from sheet:", error);
+      res.status(500).json({ error: error.message || "Failed to load staff names" });
     }
   });
 

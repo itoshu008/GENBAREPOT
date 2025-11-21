@@ -5,6 +5,8 @@ import { mastersApi, Site } from "../services/mastersApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import BackButton from "../components/BackButton";
+import SubmissionComplete from "../components/SubmissionComplete";
+import AvailabilityPrompt from "../components/AvailabilityPrompt";
 import "./StaffPage.css";
 
 function StaffPage() {
@@ -58,7 +60,7 @@ function StaffPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
   const [currentReport, setCurrentReport] = useState<ReportWithDetails | null>(null);
-
+  const [showCompletion, setShowCompletion] = useState<boolean>(false);
   // 選択された日付から年と月を取得
   const getYearMonthFromDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -314,7 +316,9 @@ function StaffPage() {
         }
 
         await submitReportToChief(reportId);
-        setMessage({ type: "success", text: "保存しました（チーフへ通知済み）" });
+        setShowCompletion(true);
+        setMessage(null);
+        window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         // 新規作成
         // スプレッドシートから取得したデータの場合、site_idはnull（現場名で識別）
@@ -346,7 +350,9 @@ function StaffPage() {
             }
             await submitReportToChief(reportResponse.data.id);
           }
-          setMessage({ type: "success", text: "保存しました（チーフへ通知済み）" });
+          setShowCompletion(true);
+          setMessage(null);
+          window.scrollTo({ top: 0, behavior: "smooth" });
         }
       }
     } catch (error: any) {
@@ -522,6 +528,20 @@ function StaffPage() {
       }
     }
   );
+
+  if (showCompletion) {
+    return (
+      <div className="staff-page">
+        <div className="container">
+          <SubmissionComplete
+            roleLabel="スタッフ報告書"
+            message="内容はチーフ・リーダーへ共有されました。"
+          />
+          <AvailabilityPrompt staffName={staffName} role="staff" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="staff-page">

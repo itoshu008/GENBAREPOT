@@ -1,6 +1,6 @@
-import { useState, useEffect, Fragment } from "react";
-import { reportsApi, ReportWithDetails, ReportStatus } from "../services/reportsApi";
-import { sheetsApi, SheetRowData } from "../services/sheetsApi";
+import { useState, useEffect, Fragment, useMemo } from "react";
+import { reportsApi, ReportWithDetails } from "../services/reportsApi";
+import { sheetsApi } from "../services/sheetsApi";
 import { useRealtimeReport, useRealtimeRole } from "../hooks/useRealtimeReport";
 import BackButton from "../components/BackButton";
 import "./SalesPage.css";
@@ -10,8 +10,11 @@ function SalesPage() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
-  const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
-  const [sheetDataLoading, setSheetDataLoading] = useState<boolean>(false);
+  const [staffOptions, setStaffOptions] = useState<string[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<string>("");
+  const [showStaffPicker, setShowStaffPicker] = useState<boolean>(false);
+  const [staffOptionsLoading, setStaffOptionsLoading] = useState<boolean>(false);
+  const [staffOptionsError, setStaffOptionsError] = useState<string | null>(null);
   const formatStaffRoles = (roles?: string | null) => {
     if (!roles) return "-";
     return roles
@@ -23,13 +26,6 @@ function SalesPage() {
       .join(" / ");
   };
 
-  // フィルタ
-  const [dateFrom, setDateFrom] = useState<string>("");
-  const [dateTo, setDateTo] = useState<string>("");
-  const [siteName, setSiteName] = useState<string>("");
-  const [location, setLocation] = useState<string>("");
-  const [status, setStatus] = useState<ReportStatus | "">("");
-
   // コメント
   const [salesComment, setSalesComment] = useState<string>("");
   const [returnReason, setReturnReason] = useState<string>("");
@@ -37,57 +33,30 @@ function SalesPage() {
   // 写真関連
   const [photos, setPhotos] = useState<Array<{ id: number; file_name: string; file_size?: number; created_at?: string }>>([]);
 
-  useEffect(() => {
-    if (dateFrom) {
-      loadSheetData();
-    }
-  }, [dateFrom]);
-
-  // スプレッドシートから日付でデータを取得（開始日付を基準）
-  const loadSheetData = async () => {
-    setSheetDataLoading(true);
-    try {
-      const response = await sheetsApi.getSheetDataByDate(dateFrom);
-      if (response.success) {
-        setSheetData(response.data);
-      }
-    } catch (error) {
-      console.warn("Error loading sheet data:", error);
-      setSheetData([]);
-    } finally {
-      setSheetDataLoading(false);
-    }
+  const deriveStaffOptions = (data: ReportWithDetails[]) => {
+    return Array.from(
+      new Set(
+        data.flatMap((report) => {
+          const names: string[] = [];
+          report.staff_entries?.forEach((entry) => {
+            if (entry.staff_name) {
+              names.push(entry.staff_name.trim());
+            }
+          });
+          if (report.created_by) {
+            names.push(report.created_by.trim());
+          }
+          return names;
+        })
+      )
+    )
+      .filter((name): name is string => typeof name === "string" && name.length > 0)
+      .sort((a, b) => a.localeCompare(b, "ja"));
   };
-
-  const sheetLocations = Array.from(
-    new Set(
-      sheetData
-        .map((row) => row.location)
-        .filter((l): l is string => !!l)
-    )
-  );
-
-  const reportsLocations = Array.from(
-    new Set(
-      reports
-        .map((report) => report.location)
-        .filter((l): l is string => !!l)
-    )
-  );
-
-  const availableLocations = (
-    sheetData.length > 0
-      ? sheetLocations
-      : !sheetDataLoading
-      ? reportsLocations
-      : []
-  ).sort((a, b) => a.localeCompare(b, "ja"));
-
-  const isLocationListLoading =
-    sheetDataLoading && sheetData.length === 0;
 
   useEffect(() => {
     loadReports();
+    loadStaffOptions();
   }, []);
 
   useEffect(() => {
@@ -137,19 +106,42 @@ function SalesPage() {
     try {
       const response = await reportsApi.getReports({
         role: "sales",
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
-        site_name: siteName || undefined,
-        location: location || undefined,
-        status: status || undefined,
       });
       if (response.success) {
-        setReports(response.data);
+        const data = response.data;
+        setReports(data);
+        if (staffOptions.length === 0) {
+          const fallback = deriveStaffOptions(data);
+          if (fallback.length > 0) {
+            setStaffOptions(fallback);
+          }
+        }
       }
     } catch (error) {
       console.error("Error loading reports:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStaffOptions = async () => {
+    setStaffOptionsLoading(true);
+    setStaffOptionsError(null);
+    try {
+      const response = await sheetsApi.getStaffNames();
+      if (response.success && Array.isArray(response.data) && response.data.length > 0) {
+        setStaffOptions(response.data);
+      } else {
+        const fallback = deriveStaffOptions(reports);
+        setStaffOptions(fallback);
+      }
+    } catch (error) {
+      console.error("Error loading staff names:", error);
+      setStaffOptionsError("担当者リストを取得できませんでした");
+      const fallback = deriveStaffOptions(reports);
+      setStaffOptions(fallback);
+    } finally {
+      setStaffOptionsLoading(false);
     }
   };
 
@@ -163,6 +155,32 @@ function SalesPage() {
       console.error("Error loading report:", error);
     }
   };
+
+  const reportHasStaff = (report: ReportWithDetails, staff: string) => {
+    if (!staff) return false;
+    return (
+      (report.staff_entries &&
+        report.staff_entries.some((entry) => entry.staff_name?.trim() === staff)) ||
+      report.created_by?.trim() === staff
+    );
+  };
+
+  const filteredReports = useMemo(() => {
+    if (!selectedStaff) return [];
+    return reports.filter((report) => reportHasStaff(report, selectedStaff));
+  }, [reports, selectedStaff]);
+
+  useEffect(() => {
+    if (selectedReport && selectedStaff && !reportHasStaff(selectedReport, selectedStaff)) {
+      setSelectedReport(null);
+    }
+  }, [selectedStaff, selectedReport]);
+
+  useEffect(() => {
+    if (selectedStaff && staffOptions.length > 0 && !staffOptions.includes(selectedStaff)) {
+      setSelectedStaff("");
+    }
+  }, [staffOptions, selectedStaff]);
 
   // リアルタイム更新: 営業ロール向けの更新を監視
   useRealtimeRole("sales", () => {
@@ -263,97 +281,86 @@ function SalesPage() {
         <BackButton />
         <h1>現場報告書 - 営業チェック</h1>
 
-        <div className="filter-section">
-          <div className="form-group">
-            <label>日付（開始）</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label>日付（終了）</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label>現場名</label>
-            <input
-              type="text"
-              value={siteName}
-              onChange={(e) => setSiteName(e.target.value)}
-              placeholder="検索"
-            />
-          </div>
-          <div className="form-group">
-            <label>場所</label>
-            <select
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              disabled={isLocationListLoading}
+        <div className="staff-selector">
+          <div className="staff-selector-header">
+            <p>営業担当を選択してください</p>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowStaffPicker((prev) => !prev)}
+              disabled={staffOptionsLoading || staffOptions.length === 0}
             >
-              {isLocationListLoading ? (
-                <option value="">場所を読み込み中...</option>
+              {staffOptionsLoading
+                ? "読み込み中..."
+                : `担当者リストを${showStaffPicker ? "閉じる" : "表示"}`}
+            </button>
+          </div>
+          {selectedStaff && (
+            <div className="selected-staff">
+              選択中: <strong>{selectedStaff}</strong>
+            </div>
+          )}
+          {staffOptionsError && <p className="error-text">{staffOptionsError}</p>}
+          {showStaffPicker && (
+            <>
+              {staffOptionsLoading ? (
+                <p>担当者情報を読み込み中...</p>
+              ) : staffOptions.length === 0 ? (
+                <p>担当者情報がありません</p>
               ) : (
-                <>
-                  <option value="">すべての場所</option>
-                  {availableLocations.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
+                <div className="staff-chip-list">
+                  {staffOptions.map((staff) => (
+                    <button
+                      key={staff}
+                      className={`staff-chip ${selectedStaff === staff ? "active" : ""}`}
+                      onClick={() => setSelectedStaff((prev) => (prev === staff ? "" : staff))}
+                    >
+                      {staff}
+                    </button>
                   ))}
-                </>
+                </div>
               )}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>ステータス</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value as any)}>
-              <option value="">すべて</option>
-              <option value="chief_submitted_to_sales">チーフ提出済み</option>
-              <option value="returned_by_sales">差戻し済み</option>
-              <option value="submitted_to_accounting">経理提出済み</option>
-            </select>
-          </div>
-          <button onClick={loadReports} className="btn btn-primary">
-            検索
-          </button>
+            </>
+          )}
         </div>
 
         <div className="reports-grid">
           <div className="reports-list">
-            <h2>報告書一覧 ({reports.length}件)</h2>
-            {loading ? (
-              <p>読み込み中...</p>
-            ) : reports.length === 0 ? (
-              <p>報告書がありません</p>
+            {selectedStaff ? (
+              <>
+                <h2>
+                  {selectedStaff} の報告書 ({filteredReports.length}件)
+                </h2>
+                {loading ? (
+                  <p>読み込み中...</p>
+                ) : filteredReports.length === 0 ? (
+                  <p>対象の報告書がありません</p>
+                ) : (
+                  <ul>
+                    {filteredReports.map((report) => (
+                      <li
+                        key={report.id}
+                        onClick={() => handleReportSelect(report.id!)}
+                        className={selectedReport?.id === report.id ? "active" : ""}
+                      >
+                        <div className="report-header">
+                          <strong>{report.site_name}</strong>
+                          <span className={`status-badge status-${report.status}`}>
+                            {report.status}
+                          </span>
+                        </div>
+                        <div className="meta">
+                          {report.report_date} - {report.location || "場所未設定"}
+                        </div>
+                        {report.chief_name && (
+                          <div className="meta">チーフ: {report.chief_name}</div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             ) : (
-              <ul>
-                {reports.map((report) => (
-                  <li
-                    key={report.id}
-                    onClick={() => handleReportSelect(report.id!)}
-                    className={selectedReport?.id === report.id ? "active" : ""}
-                  >
-                    <div className="report-header">
-                      <strong>{report.site_name}</strong>
-                      <span className={`status-badge status-${report.status}`}>
-                        {report.status}
-                      </span>
-                    </div>
-                    <div className="meta">
-                      {report.report_date} - {report.location || "場所未設定"}
-                    </div>
-                    {report.chief_name && (
-                      <div className="meta">チーフ: {report.chief_name}</div>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <p>担当者を選択すると報告書が表示されます。</p>
             )}
           </div>
 

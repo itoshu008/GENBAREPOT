@@ -7,6 +7,8 @@ import {
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
 import BackButton from "../components/BackButton";
+import SubmissionComplete from "../components/SubmissionComplete";
+import AvailabilityPrompt from "../components/AvailabilityPrompt";
 import "./ChiefPage.css";
 
 const formatStaffRoles = (roles?: string | null) => {
@@ -46,6 +48,7 @@ function ChiefPage() {
   const [photos, setPhotos] = useState<Array<{ id: number; file_name: string; file_size?: number; created_at?: string }>>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState<boolean>(false);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const [showCompletion, setShowCompletion] = useState<boolean>(false);
 
   useEffect(() => {
     loadSheetData();
@@ -543,9 +546,9 @@ function ChiefPage() {
         chiefName
       );
 
-      setMessage({ type: "success", text: "営業へ提出しました" });
-      // 報告書を再取得
-      await loadReportBySite();
+      setShowCompletion(true);
+      setMessage(null);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error: any) {
       setMessage({
         type: "error",
@@ -555,6 +558,20 @@ function ChiefPage() {
       setLoading(false);
     }
   };
+
+  if (showCompletion) {
+    return (
+      <div className="chief-page">
+        <div className="container">
+          <SubmissionComplete
+            roleLabel="チーフ・リーダー報告書"
+            message="営業へ提出が完了しました。"
+          />
+          <AvailabilityPrompt staffName={chiefName} role="chief" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="chief-page">

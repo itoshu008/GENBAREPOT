@@ -1,0 +1,13 @@
+-- スタッフ空き日申請テーブル
+CREATE TABLE IF NOT EXISTS staff_availability (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  available_date DATE NOT NULL,
+  staff_name VARCHAR(100) NOT NULL,
+  role VARCHAR(50) DEFAULT NULL,
+  message TEXT DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_staff_date (available_date, staff_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
