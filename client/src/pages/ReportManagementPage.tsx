@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from "react";
 import { reportsApi, ReportWithDetails } from "../services/reportsApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
+import BackButton from "../components/BackButton";
 import "./ReportManagementPage.css";
 
 function ReportManagementPage() {
@@ -197,6 +198,7 @@ function ReportManagementPage() {
   return (
     <div className="report-management-page">
       <div className="container">
+        <BackButton />
         <h1>報告書管理</h1>
 
         <div className="filter-section">

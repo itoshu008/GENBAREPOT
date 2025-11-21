@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { sheetsApi, Sheet } from "../services/sheetsApi";
 import { mastersApi } from "../services/mastersApi";
 import { getSocket } from "../services/socket";
+import BackButton from "../components/BackButton";
 import "./MasterPage.css";
 
 interface SheetFormData {
@@ -209,6 +210,7 @@ function MasterPage() {
   return (
     <div className="master-page">
       <div className="container">
+        <BackButton />
         <h1>現場報告アプリ - マスター管理</h1>
 
         <div className="sheets-section">

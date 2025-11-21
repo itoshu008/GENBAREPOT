@@ -24,6 +24,7 @@ export interface SheetRowData {
   site_name: string;
   location: string | null;
   staff_name: string;
+  site_code?: string | null;
 }
 
 export const sheetsApi = {

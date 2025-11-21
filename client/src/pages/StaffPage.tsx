@@ -4,6 +4,7 @@ import { reportsApi, Report, ReportWithDetails } from "../services/reportsApi";
 import { mastersApi, Site } from "../services/mastersApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
+import BackButton from "../components/BackButton";
 import "./StaffPage.css";
 
 function StaffPage() {
@@ -525,6 +526,7 @@ function StaffPage() {
   return (
     <div className="staff-page">
       <div className="container">
+        <BackButton />
         <div className="page-header">
           <h1>現場報告書 - スタッフ</h1>
         </div>

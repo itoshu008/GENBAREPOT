@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from "react";
 import { reportsApi, ReportWithDetails } from "../services/reportsApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport, useRealtimeRole } from "../hooks/useRealtimeReport";
+import BackButton from "../components/BackButton";
 import "./AccountingPage.css";
 
 function AccountingPage() {
@@ -220,6 +221,7 @@ function AccountingPage() {
   return (
     <div className="accounting-page">
       <div className="container">
+        <BackButton />
         <h1>現場報告書 - 経理チェック</h1>
 
         <div className="filter-section">

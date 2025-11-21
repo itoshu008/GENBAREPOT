@@ -6,6 +6,7 @@ import {
 } from "../services/reportsApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
+import BackButton from "../components/BackButton";
 import "./ChiefPage.css";
 
 const formatStaffRoles = (roles?: string | null) => {
@@ -239,29 +240,56 @@ function ChiefPage() {
     return null;
   };
 
-  // 現場名で報告書を取得
+  // 現場名で報告書を取得（存在しない場合は自動的に作成）
   const loadReportBySite = async () => {
-    if (!selectedSiteName || !dateFilter) return;
+    if (!selectedSiteName || !dateFilter || !selectedLocation) return;
 
     setLoading(true);
     try {
+      // statusフィルタを削除して、すべてのステータスの報告書を取得
       const response = await reportsApi.getReports({
         role: "chief",
         date_from: dateFilter,
         date_to: dateFilter,
         site_name: selectedSiteName,
-        status: "staff_submitted",
+        // statusフィルタを削除：スタッフの報告がなくてもチーフが先に入力できるように
       });
-        if (response.success && response.data.length > 0) {
-          setAvailableReports(response.data);
-          if (response.data.length === 1) {
-            await fetchReportDetail(response.data[0].id!);
-          } else {
-            setSelectedReport(null);
+      
+      if (response.success && response.data.length > 0) {
+        // 報告書が存在する場合
+        setAvailableReports(response.data);
+        if (response.data.length === 1) {
+          await fetchReportDetail(response.data[0].id!);
+        } else {
+          setSelectedReport(null);
+        }
+      } else {
+        // 報告書が存在しない場合は自動的に作成
+        const siteCode = sheetData.find(
+          row => row.site_name === selectedSiteName && row.location === selectedLocation
+        )?.site_code || "";
+
+        const createResponse = await reportsApi.createReport({
+          report_date: dateFilter,
+          site_id: null, // site_idはサーバー側で自動解決される
+          site_code: siteCode,
+          site_name: selectedSiteName,
+          location: selectedLocation,
+          created_by: chiefName || "chief",
+          status: "staff_draft",
+        });
+
+        if (createResponse.success) {
+          // 作成した報告書を取得して表示
+          const reportResponse = await reportsApi.getReport(createResponse.data.id);
+          if (reportResponse.success) {
+            setSelectedReport(reportResponse.data);
+            setAvailableReports([reportResponse.data]);
           }
         } else {
-        setAvailableReports([]);
-        setSelectedReport(null);
+          setAvailableReports([]);
+          setSelectedReport(null);
+        }
       }
     } catch (error) {
       console.error("Error loading report:", error);
@@ -489,9 +517,10 @@ function ChiefPage() {
     }
   };
 
+
   const handleSubmitToSales = async () => {
     if (!selectedReport?.id || !chiefName) {
-      setMessage({ type: "error", text: "チーフ名を入力してください" });
+        setMessage({ type: "error", text: "チーフ・リーダー氏名を入力してください" });
       return;
     }
 
@@ -530,6 +559,7 @@ function ChiefPage() {
   return (
     <div className="chief-page">
       <div className="container">
+        <BackButton />
         <div className="page-header">
           <h1>現場報告書 - チーフ・リーダー</h1>
           <div className="header-menu">
@@ -602,8 +632,6 @@ function ChiefPage() {
           <p>読み込み中...</p>
         ) : !selectedSiteName ? (
           <p>日付、場所、現場名を選択してください</p>
-        ) : availableReports.length === 0 ? (
-          <p>この日付・現場の報告書が見つかりませんでした</p>
         ) : availableReports.length > 1 && !selectedReport ? (
           <div className="reports-list">
             <h2>報告書を選択してください ({availableReports.length}件)</h2>
@@ -634,7 +662,7 @@ function ChiefPage() {
             <h2>報告書詳細</h2>
 
             <div className="form-group">
-              <label>チーフ氏名</label>
+              <label>チーフ・リーダー氏名</label>
               <input
                 type="text"
                 value={chiefName}
@@ -685,12 +713,12 @@ function ChiefPage() {
             </div>
 
             <div className="form-group">
-              <label>チーフ報告欄</label>
+              <label>チーフ・リーダー報告欄</label>
               <textarea
                 value={chiefReportContent}
                 onChange={(e) => setChiefReportContent(e.target.value)}
                 rows={4}
-                placeholder="チーフとしての報告内容を記入してください"
+                placeholder="チーフ・リーダーとしての報告内容を記入してください"
               />
             </div>
 

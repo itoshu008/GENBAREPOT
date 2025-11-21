@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from "react";
 import { reportsApi, ReportWithDetails, ReportStatus } from "../services/reportsApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport, useRealtimeRole } from "../hooks/useRealtimeReport";
+import BackButton from "../components/BackButton";
 import "./SalesPage.css";
 
 function SalesPage() {
@@ -259,6 +260,7 @@ function SalesPage() {
   return (
     <div className="sales-page">
       <div className="container">
+        <BackButton />
         <h1>現場報告書 - 営業チェック</h1>
 
         <div className="filter-section">
