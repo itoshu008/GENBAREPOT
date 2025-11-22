@@ -52,70 +52,22 @@ function WatchmanPage() {
 
   useEffect(() => {
     loadReports();
-    loadStaffOptions();
   }, []);
 
-  // 営業担当者リストを読み込む
-  const loadStaffOptions = async () => {
-    setStaffOptionsLoading(true);
-    try {
-      const response = await sheetsApi.getStaffNames();
-      if (response.success && Array.isArray(response.data) && response.data.length > 0) {
-        const unique = new Map<string, string>();
-        response.data.forEach((name) => {
-          if (typeof name === "string") {
-            const cleaned = name.trim();
-            const normalized = normalizeName(cleaned);
-            if (normalized && !unique.has(normalized)) {
-              unique.set(normalized, cleaned);
-            }
-          }
-        });
-        setStaffOptions(Array.from(unique.values()).sort((a, b) => a.localeCompare(b, "ja")));
-      }
-    } catch (error) {
-      console.error("Error loading staff options:", error);
-    } finally {
-      setStaffOptionsLoading(false);
-    }
-  };
-
-
-  // 報告書が選択された担当者に関連しているかチェック
-  const reportHasStaff = useMemo(() => {
-    return (date: string, staff: string): boolean => {
-      if (!staff) return true; // 担当者が選択されていない場合はすべて表示
-      
-      const target = normalizeName(staff);
-      if (!target) return true;
-
-      // スプレッドシートの担当者割り当てを確認
-      const salesAssignment = salesAssignments[date];
-      if (salesAssignment && normalizeName(salesAssignment) === target) {
-        return true;
-      }
-
-      return false;
-    };
-  }, [salesAssignments]);
-
-  // 報告書を日付ごとにグループ化（選択された担当者でフィルタリング）
+  // 報告書を日付ごとにグループ化
   const groupedReports = useMemo(() => {
     const groups: Record<string, ReportWithDetails[]> = {};
     
     reports.forEach((report) => {
       const dateStr = normalizeDate(report.report_date);
-      // 担当者が選択されている場合、その担当者に関連する報告書のみを表示
-      if (!selectedStaff || reportHasStaff(dateStr, selectedStaff)) {
-        if (!groups[dateStr]) {
-          groups[dateStr] = [];
-        }
-        groups[dateStr].push(report);
+      if (!groups[dateStr]) {
+        groups[dateStr] = [];
       }
+      groups[dateStr].push(report);
     });
 
     return groups;
-  }, [reports, selectedStaff, reportHasStaff]);
+  }, [reports]);
 
   // 日付ごとの営業担当を読み込む
   useEffect(() => {
