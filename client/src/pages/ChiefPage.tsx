@@ -1033,15 +1033,18 @@ function ChiefPage() {
                   <label>日付</label>
                   <div className="value">{dateFilter}</div>
                 </div>
-                {selectedSiteName && selectedSiteName !== "留守番スタッフ" && (
+                {(() => {
+                  const siteName = selectedReport?.site_name || selectedSiteName;
+                  return siteName && siteName !== "留守番スタッフ";
+                })() && (
                   <div className="form-group">
                     <label>場所</label>
-                    <div className="value">{selectedLocation || "未選択"}</div>
+                    <div className="value">{selectedLocation || selectedReport?.location || "未選択"}</div>
                   </div>
                 )}
                 <div className="form-group">
                   <label>現場名</label>
-                  <div className="value">{selectedSiteName || "未選択"}</div>
+                  <div className="value">{selectedReport?.site_name || selectedSiteName || "未選択"}</div>
                 </div>
               </div>
             )}
