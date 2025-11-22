@@ -46,12 +46,12 @@ function SelectPage() {
 
           <button
             className="select-button watch-button"
-            onClick={() => navigate("/chief")}
+            onClick={() => navigate("/watchman")}
           >
             <div className="button-icon">🏠</div>
             <div className="button-content">
               <div className="button-title">留守番ページ</div>
-              <div className="button-description">留守番業務の報告書を作成</div>
+              <div className="button-description">留守番業務の報告書を確認</div>
             </div>
           </button>
         </div>

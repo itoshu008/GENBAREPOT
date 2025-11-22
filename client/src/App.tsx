@@ -7,6 +7,7 @@ import AccountingPage from "./pages/AccountingPage";
 import ReportManagementPage from "./pages/ReportManagementPage";
 import AvailabilityAdminPage from "./pages/AvailabilityAdminPage";
 import SelectPage from "./pages/SelectPage";
+import WatchmanPage from "./pages/WatchmanPage";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
       <Route path="/select" element={<SelectPage />} />
       <Route path="/staff" element={<StaffPage />} />
       <Route path="/chief" element={<ChiefPage />} />
+      <Route path="/watchman" element={<WatchmanPage />} />
       <Route path="/sales" element={<SalesPage />} />
       <Route path="/accounting" element={<AccountingPage />} />
       <Route path="/admin/reports" element={<ReportManagementPage />} />
