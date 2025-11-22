@@ -295,11 +295,25 @@ function ChiefPage() {
       // 既に読み込まれているsheetDataからも検索を試みる
       if (sheetData.length > 0 && sheetData[0].date === reportDateStr) {
         const normalizedTarget = normalizeSiteName(selectedReport.site_name);
+        const targetLocation = selectedReport.location || selectedLocation;
+        
+        // 現場名と場所の両方でマッチ（場所が指定されている場合）
         let matchBySite = sheetData.find(
-          (row: SheetRowData) => normalizeSiteName(row.site_name) === normalizedTarget
+          (row: SheetRowData) => {
+            const normalizedRow = normalizeSiteName(row.site_name);
+            const locationMatch = !targetLocation || row.location === targetLocation;
+            return normalizeSiteName(row.site_name) === normalizedTarget && locationMatch;
+          }
         );
         
-        // 完全一致がない場合、部分一致を試す
+        // 完全一致がない場合、現場名のみでマッチ
+        if (!matchBySite) {
+          matchBySite = sheetData.find(
+            (row: SheetRowData) => normalizeSiteName(row.site_name) === normalizedTarget
+          );
+        }
+        
+        // それでも見つからない場合、部分一致を試す
         if (!matchBySite) {
           matchBySite = sheetData.find(
             (row: SheetRowData) => {
@@ -309,20 +323,21 @@ function ChiefPage() {
           );
         }
         
-        const matched = matchBySite || sheetData[0];
-        const staffName = matched?.staff_name?.trim() || "";
-        
-        if (staffName) {
-          setSalesAssignment(staffName);
-          // 次回のためにsheetAssignmentsに保存
-          if (jobKey) {
-            setSheetAssignments((prev) => ({ ...prev, [jobKey]: staffName }));
+        // 現場名でマッチした場合のみ使用（最初のエントリは使わない）
+        if (matchBySite) {
+          const staffName = matchBySite.staff_name?.trim() || "";
+          if (staffName) {
+            setSalesAssignment(staffName);
+            // 次回のためにsheetAssignmentsに保存
+            if (jobKey) {
+              setSheetAssignments((prev) => ({ ...prev, [jobKey]: staffName }));
+            }
+            if (dateKey) {
+              setSheetAssignments((prev) => ({ ...prev, [dateKey]: staffName }));
+            }
+            setSalesAssignmentLoading(false);
+            return;
           }
-          if (dateKey) {
-            setSheetAssignments((prev) => ({ ...prev, [dateKey]: staffName }));
-          }
-          setSalesAssignmentLoading(false);
-          return;
         }
       }
 
@@ -339,17 +354,31 @@ function ChiefPage() {
       if (response.success && Array.isArray(response.data) && response.data.length > 0) {
         console.log("loadSalesAssignment - sheet data rows:", response.data.length);
         const normalizedTarget = normalizeSiteName(selectedReport.site_name);
-        console.log("loadSalesAssignment - normalizedTarget:", normalizedTarget);
+        const targetLocation = selectedReport.location || selectedLocation;
+        console.log("loadSalesAssignment - normalizedTarget:", normalizedTarget, "targetLocation:", targetLocation);
+        console.log("loadSalesAssignment - all sheet data:", response.data.map(r => ({
+          site_name: r.site_name,
+          location: r.location,
+          staff_name: r.staff_name
+        })));
         
-        // job_idでマッチ（job_idは動的に生成されるため、完全一致は難しい）
-        // 代わりに、現場名と日付でマッチを優先
-        
-        // 現場名でマッチ（部分一致も試す）
+        // 現場名と場所の両方でマッチ（場所が指定されている場合）
         let matchBySite = response.data.find(
-          (row: SheetRowData) => normalizeSiteName(row.site_name) === normalizedTarget
+          (row: SheetRowData) => {
+            const normalizedRow = normalizeSiteName(row.site_name);
+            const locationMatch = !targetLocation || row.location === targetLocation;
+            return normalizedRow === normalizedTarget && locationMatch;
+          }
         );
         
-        // 完全一致がない場合、部分一致を試す
+        // 完全一致がない場合、現場名のみでマッチ
+        if (!matchBySite) {
+          matchBySite = response.data.find(
+            (row: SheetRowData) => normalizeSiteName(row.site_name) === normalizedTarget
+          );
+        }
+        
+        // それでも見つからない場合、部分一致を試す
         if (!matchBySite) {
           matchBySite = response.data.find(
             (row: SheetRowData) => {
@@ -359,11 +388,16 @@ function ChiefPage() {
           );
         }
         
-        // 現場名でマッチできない場合、同じ日付の最初のエントリを使用
-        const matched = matchBySite || response.data[0];
+        // 現場名でマッチした場合のみ使用（最初のエントリは使わない）
+        if (!matchBySite) {
+          console.warn("loadSalesAssignment - no match found for site:", selectedReport.site_name);
+          setSalesAssignment("");
+          setSalesAssignmentLoading(false);
+          return;
+        }
         
-        console.log("loadSalesAssignment - matched:", matched);
-        const staffName = matched?.staff_name?.trim() || "";
+        console.log("loadSalesAssignment - matched:", matchBySite);
+        const staffName = matchBySite.staff_name?.trim() || "";
         console.log("loadSalesAssignment - staffName:", staffName);
         
         if (staffName) {
