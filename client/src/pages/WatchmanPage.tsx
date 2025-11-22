@@ -185,8 +185,8 @@ function WatchmanPage() {
                   )}
                   {report.chief_report_content && (
                     <div className="chief-report">
-                      <strong>チーフ報告:</strong>
-                      <p>{report.chief_report_content}</p>
+                      <strong>報告内容:</strong>
+                      <div className="report-content-text">{report.chief_report_content}</div>
                     </div>
                   )}
                   <div className="report-status">
