@@ -280,9 +280,9 @@ function ChiefPage() {
       console.log("loadSalesAssignment - original date:", selectedReport.report_date, "converted:", reportDateStr);
       
       // まず、sheetAssignmentsから取得を試みる（場所も考慮）
-      const targetLocation = selectedReport.location || selectedLocation;
+      const targetLocationForCache = selectedReport.location || selectedLocation;
       const jobKey = makeAssignmentKey(selectedReport.job_id, reportDateStr, selectedReport.site_name);
-      const locationKey = targetLocation ? `location:${reportDateStr}|${targetLocation}` : null;
+      const locationKey = targetLocationForCache ? `location:${reportDateStr}|${targetLocationForCache}` : null;
       
       // jobKeyでマッチ（最優先）
       if (sheetAssignments[jobKey]) {
@@ -303,7 +303,6 @@ function ChiefPage() {
       // dateKeyは使わない（場所を考慮しないため、誤った結果を返す可能性がある）
 
         // 既に読み込まれているsheetDataからも検索を試みる
-      const targetLocation = selectedReport.location || selectedLocation;
       if (sheetData.length > 0 && sheetData[0].date === reportDateStr) {
         const normalizedTarget = normalizeSiteName(selectedReport.site_name);
         
@@ -311,7 +310,7 @@ function ChiefPage() {
         let matchBySite = sheetData.find(
           (row: SheetRowData) => {
             const normalizedRow = normalizeSiteName(row.site_name);
-            const locationMatch = !targetLocation || row.location === targetLocation;
+            const locationMatch = !targetLocationForCache || row.location === targetLocationForCache;
             return normalizeSiteName(row.site_name) === normalizedTarget && locationMatch;
           }
         );
@@ -334,9 +333,9 @@ function ChiefPage() {
         }
         
         // 現場名でマッチできない場合、場所だけでマッチを試みる
-        if (!matchBySite && targetLocation) {
+        if (!matchBySite && targetLocationForCache) {
           matchBySite = sheetData.find(
-            (row: SheetRowData) => row.location === targetLocation
+            (row: SheetRowData) => row.location === targetLocationForCache
           );
           if (matchBySite) {
             console.log("loadSalesAssignment - matched by location only (cached):", matchBySite);
@@ -374,8 +373,7 @@ function ChiefPage() {
       if (response.success && Array.isArray(response.data) && response.data.length > 0) {
         console.log("loadSalesAssignment - sheet data rows:", response.data.length);
         const normalizedTarget = normalizeSiteName(selectedReport.site_name);
-        const targetLocation = selectedReport.location || selectedLocation;
-        console.log("loadSalesAssignment - normalizedTarget:", normalizedTarget, "targetLocation:", targetLocation);
+        console.log("loadSalesAssignment - normalizedTarget:", normalizedTarget, "targetLocation:", targetLocationForCache);
         const allSheetData = response.data.map(r => ({
           site_name: r.site_name,
           normalized_site_name: normalizeSiteName(r.site_name),
@@ -387,14 +385,14 @@ function ChiefPage() {
         console.log("loadSalesAssignment - searching for:", {
           site_name: selectedReport.site_name,
           normalized: normalizedTarget,
-          location: targetLocation
+          location: targetLocationForCache
         });
         
         // 現場名と場所の両方でマッチ（場所が指定されている場合）
         let matchBySite = response.data.find(
           (row: SheetRowData) => {
             const normalizedRow = normalizeSiteName(row.site_name);
-            const locationMatch = !targetLocation || row.location === targetLocation;
+            const locationMatch = !targetLocationForCache || row.location === targetLocationForCache;
             const siteMatch = normalizedRow === normalizedTarget;
             if (siteMatch && locationMatch) {
               console.log("loadSalesAssignment - matched by site and location:", row);
@@ -459,15 +457,15 @@ function ChiefPage() {
         // 現場名でマッチした場合のみ使用
         if (!matchBySite) {
           // 現場名でマッチできない場合、場所だけでマッチを試みる
-          if (targetLocation) {
+          if (targetLocationForCache) {
             const matchByLocation = response.data.find(
-              (row: SheetRowData) => row.location === targetLocation
+              (row: SheetRowData) => row.location === targetLocationForCache
             );
             if (matchByLocation) {
               console.log("loadSalesAssignment - matched by location only:", matchByLocation);
               matchBySite = matchByLocation;
             } else {
-              console.warn("loadSalesAssignment - no match found for site:", selectedReport.site_name, "location:", targetLocation);
+              console.warn("loadSalesAssignment - no match found for site:", selectedReport.site_name, "location:", targetLocationForCache);
               setSalesAssignment("");
               setSalesAssignmentLoading(false);
               return;
