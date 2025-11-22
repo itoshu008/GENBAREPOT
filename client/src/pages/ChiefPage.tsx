@@ -79,7 +79,16 @@ function ChiefPage() {
     setSelectedSiteName("");
     setSelectedReport(null);
     setAvailableReports([]);
+    // 営業担当もリセット
+    setSalesAssignment("");
   }, [selectedLocation]);
+
+  // 場所が変更され、報告書が選択されている場合は営業担当を再読み込み
+  useEffect(() => {
+    if (selectedLocation && selectedReport) {
+      loadSalesAssignment();
+    }
+  }, [selectedLocation, selectedReport]);
 
   // 場所が選択され、フィルタリングされた現場が1つしかない場合は自動選択
   useEffect(() => {
@@ -1103,7 +1112,7 @@ function ChiefPage() {
                             <div className="staff-report-content">
                               {entry.report_content || "-"}
                             </div>
-                          </td>
+                        </td>
                       </tr>
                       </Fragment>
                     ))}
