@@ -22,8 +22,10 @@ const formatStaffRoles = (roles?: string | null) => {
     .join(" / ");
 };
 
-const normalizeSiteName = (name?: string | null) =>
-  (name || "").replace(/[\s\u3000]/g, "").toLowerCase();
+const normalizeSiteName = (name?: string | null) => {
+  const result = (name || "").replace(/[\s\u3000]/g, "").toLowerCase();
+  return result;
+};
 
 const makeAssignmentKey = (jobId?: string | null, date?: string | null, site?: string | null) => {
   if (jobId) {
@@ -356,12 +358,14 @@ function ChiefPage() {
         const normalizedTarget = normalizeSiteName(selectedReport.site_name);
         const targetLocation = selectedReport.location || selectedLocation;
         console.log("loadSalesAssignment - normalizedTarget:", normalizedTarget, "targetLocation:", targetLocation);
-        console.log("loadSalesAssignment - all sheet data:", response.data.map(r => ({
+        const allSheetData = response.data.map(r => ({
           site_name: r.site_name,
           normalized_site_name: normalizeSiteName(r.site_name),
           location: r.location,
           staff_name: r.staff_name
-        })));
+        }));
+        console.log("loadSalesAssignment - all sheet data:", allSheetData);
+        console.table(allSheetData); // テーブル形式で見やすく表示
         console.log("loadSalesAssignment - searching for:", {
           site_name: selectedReport.site_name,
           normalized: normalizedTarget,
