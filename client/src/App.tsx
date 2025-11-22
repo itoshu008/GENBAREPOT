@@ -8,6 +8,7 @@ import ReportManagementPage from "./pages/ReportManagementPage";
 import AvailabilityAdminPage from "./pages/AvailabilityAdminPage";
 import SelectPage from "./pages/SelectPage";
 import WatchmanPage from "./pages/WatchmanPage";
+import WatchmanInputPage from "./pages/WatchmanInputPage";
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
       <Route path="/staff" element={<StaffPage />} />
       <Route path="/chief" element={<ChiefPage />} />
       <Route path="/watchman" element={<WatchmanPage />} />
+      <Route path="/watchman/input" element={<WatchmanInputPage />} />
       <Route path="/sales" element={<SalesPage />} />
       <Route path="/accounting" element={<AccountingPage />} />
       <Route path="/admin/reports" element={<ReportManagementPage />} />
