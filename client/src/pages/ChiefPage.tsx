@@ -1033,10 +1033,12 @@ function ChiefPage() {
                   <label>日付</label>
                   <div className="value">{dateFilter}</div>
                 </div>
-                <div className="form-group">
-                  <label>場所</label>
-                  <div className="value">{selectedLocation || "未選択"}</div>
-                </div>
+                {selectedSiteName && !selectedSiteName.includes("留守番") && (
+                  <div className="form-group">
+                    <label>場所</label>
+                    <div className="value">{selectedLocation || "未選択"}</div>
+                  </div>
+                )}
                 <div className="form-group">
                   <label>現場名</label>
                   <div className="value">{selectedSiteName || "未選択"}</div>
