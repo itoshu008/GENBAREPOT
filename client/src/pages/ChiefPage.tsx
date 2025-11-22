@@ -270,26 +270,24 @@ function ChiefPage() {
         return;
       }
 
-      // sheetAssignmentsにない場合は、直接スプレッドシートから取得
-      const response = await sheetsApi.getSheetDataByDate(selectedReport.report_date);
-      if (response.success && Array.isArray(response.data) && response.data.length > 0) {
+      // 既に読み込まれているsheetDataからも検索を試みる
+      if (sheetData.length > 0 && sheetData[0].date === selectedReport.report_date) {
         const normalizedTarget = normalizeSiteName(selectedReport.site_name);
+        let matchBySite = sheetData.find(
+          (row: SheetRowData) => normalizeSiteName(row.site_name) === normalizedTarget
+        );
         
-        // job_idでマッチ
-        const matchByJob =
-          selectedReport.job_id &&
-          response.data.find((row: SheetRowData) => row.job_id === selectedReport.job_id);
-        
-        // 現場名でマッチ
-        const matchBySite =
-          response.data.find(
-            (row: SheetRowData) => normalizeSiteName(row.site_name) === normalizedTarget
+        // 完全一致がない場合、部分一致を試す
+        if (!matchBySite) {
+          matchBySite = sheetData.find(
+            (row: SheetRowData) => {
+              const normalizedRow = normalizeSiteName(row.site_name);
+              return normalizedRow.includes(normalizedTarget) || normalizedTarget.includes(normalizedRow);
+            }
           );
+        }
         
-        // 日付でマッチ（最初のエントリ）
-        const matchByDate = response.data[0];
-        
-        const matched = matchByJob || matchBySite || matchByDate;
+        const matched = matchBySite || sheetData[0];
         const staffName = matched?.staff_name?.trim() || "";
         
         if (staffName) {
@@ -301,10 +299,68 @@ function ChiefPage() {
           if (dateKey) {
             setSheetAssignments((prev) => ({ ...prev, [dateKey]: staffName }));
           }
+          setSalesAssignmentLoading(false);
+          return;
+        }
+      }
+
+      // sheetAssignmentsにない場合は、直接スプレッドシートから取得
+      const response = await sheetsApi.getSheetDataByDate(selectedReport.report_date);
+      console.log("loadSalesAssignment - response:", response);
+      console.log("loadSalesAssignment - selectedReport:", {
+        report_date: selectedReport.report_date,
+        site_name: selectedReport.site_name,
+        job_id: selectedReport.job_id,
+      });
+      
+      if (response.success && Array.isArray(response.data) && response.data.length > 0) {
+        console.log("loadSalesAssignment - sheet data rows:", response.data.length);
+        const normalizedTarget = normalizeSiteName(selectedReport.site_name);
+        console.log("loadSalesAssignment - normalizedTarget:", normalizedTarget);
+        
+        // job_idでマッチ（job_idは動的に生成されるため、完全一致は難しい）
+        // 代わりに、現場名と日付でマッチを優先
+        
+        // 現場名でマッチ（部分一致も試す）
+        let matchBySite = response.data.find(
+          (row: SheetRowData) => normalizeSiteName(row.site_name) === normalizedTarget
+        );
+        
+        // 完全一致がない場合、部分一致を試す
+        if (!matchBySite) {
+          matchBySite = response.data.find(
+            (row: SheetRowData) => {
+              const normalizedRow = normalizeSiteName(row.site_name);
+              return normalizedRow.includes(normalizedTarget) || normalizedTarget.includes(normalizedRow);
+            }
+          );
+        }
+        
+        // 現場名でマッチできない場合、同じ日付の最初のエントリを使用
+        const matched = matchBySite || response.data[0];
+        
+        console.log("loadSalesAssignment - matched:", matched);
+        const staffName = matched?.staff_name?.trim() || "";
+        console.log("loadSalesAssignment - staffName:", staffName);
+        
+        if (staffName) {
+          setSalesAssignment(staffName);
+          // 次回のためにsheetAssignmentsに保存
+          if (jobKey) {
+            setSheetAssignments((prev) => ({ ...prev, [jobKey]: staffName }));
+          }
+          if (dateKey) {
+            setSheetAssignments((prev) => ({ ...prev, [dateKey]: staffName }));
+          }
         } else {
+          console.warn("loadSalesAssignment - staffName is empty after matching");
           setSalesAssignment("");
         }
       } else {
+        console.warn("loadSalesAssignment - no data from sheet:", {
+          success: response.success,
+          dataLength: Array.isArray(response.data) ? response.data.length : 0,
+        });
         // スプレッドシートにデータがない場合は空文字列
         setSalesAssignment("");
       }
