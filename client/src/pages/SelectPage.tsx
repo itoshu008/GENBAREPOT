@@ -1,38 +1,8 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
 import "./SelectPage.css";
 
 function SelectPage() {
   const navigate = useNavigate();
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    // スマホ判定（画面幅768px以下、またはタッチデバイス）
-    const checkMobile = () => {
-      const isMobileDevice = window.innerWidth <= 768 || 
-                            ('ontouchstart' in window) ||
-                            (navigator.maxTouchPoints > 0);
-      setIsMobile(isMobileDevice);
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  if (!isMobile) {
-    return (
-      <div className="select-page">
-        <div className="select-container">
-          <div className="desktop-message">
-            <h2>📱 スマートフォン専用ページ</h2>
-            <p>このページはスマートフォンでのみ表示されます。</p>
-            <p>スマートフォンからアクセスしてください。</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="select-page">

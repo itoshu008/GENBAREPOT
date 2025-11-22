@@ -14,6 +14,7 @@
   max-width: 600px;
   width: 100%;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
 }
 
 .select-container h1 {
@@ -128,28 +129,11 @@
   background: #ffa500;
 }
 
-.desktop-message {
-  text-align: center;
-  padding: 40px 20px;
-}
-
-.desktop-message h2 {
-  font-size: 24px;
-  color: #333;
-  margin-bottom: 16px;
-}
-
-.desktop-message p {
-  font-size: 16px;
-  color: #666;
-  margin: 8px 0;
-  line-height: 1.6;
-}
-
-/* デスクトップ表示を非表示（スマホ専用） */
+/* PCでもスマホサイズのレイアウトで表示 */
 @media (min-width: 769px) {
-  .select-page:not(:has(.desktop-message)) {
-    display: none;
+  .select-container {
+    max-width: 600px;
+    padding: 40px;
   }
 }
 
