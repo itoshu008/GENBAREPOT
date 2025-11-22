@@ -4,7 +4,6 @@ import { reportsApi, Report, ReportWithDetails } from "../services/reportsApi";
 import { mastersApi, Site } from "../services/mastersApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
 import { useRealtimeReport } from "../hooks/useRealtimeReport";
-import BackButton from "../components/BackButton";
 import SubmissionComplete from "../components/SubmissionComplete";
 import AvailabilityPrompt from "../components/AvailabilityPrompt";
 import "./StaffPage.css";
@@ -129,19 +128,25 @@ function StaffPage() {
               .filter((row) => row.location === selectedLocation)
               .map((row) => ({
                 id: undefined,
+                job_id: row.job_id || `${row.date}|${row.site_name}`,
                 year: new Date(reportDate).getFullYear(),
                 month: new Date(reportDate).getMonth() + 1,
                 site_code: "",
                 site_name: row.site_name,
                 location: row.location,
+                staff_name: row.staff_name,
+                date: row.date,
               }))
           : sheetData.map((row) => ({
               id: undefined,
+              job_id: row.job_id || `${row.date}|${row.site_name}`,
               year: new Date(reportDate).getFullYear(),
               month: new Date(reportDate).getMonth() + 1,
               site_code: "",
               site_name: row.site_name,
               location: row.location,
+              staff_name: row.staff_name,
+              date: row.date,
             })))
       : !sheetDataLoading
       ? selectedLocation
@@ -328,6 +333,7 @@ function StaffPage() {
           site_code: selectedSite?.site_code || "",
           site_name: selectedSite?.site_name || "",
           location: selectedSite?.location || null,
+          job_id: selectedSite?.job_id,
           staff_name: staffName,
           staff_roles: staffRoleString,
           report_content: reportContent,
@@ -546,9 +552,11 @@ function StaffPage() {
   return (
     <div className="staff-page">
       <div className="container">
-        <BackButton />
         <div className="page-header">
           <h1>現場報告書 - スタッフ</h1>
+        </div>
+        <div className="staff-notice-box">
+          <p>一人現場の場合はここで入力せずチーフ・リーダー専用ページから入力をお願いします。</p>
         </div>
 
         <div className="form-section">
