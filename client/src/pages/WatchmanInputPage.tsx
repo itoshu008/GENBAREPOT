@@ -12,6 +12,7 @@ function WatchmanInputPage() {
   const navigate = useNavigate();
   const [name, setName] = useState<string>("");
   const [meetingPlace, setMeetingPlace] = useState<string>("");
+  const [movementNote, setMovementNote] = useState<string>("");
   const [meetingTime, setMeetingTime] = useState<string>("");
   const [finishTime, setFinishTime] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -72,7 +73,10 @@ function WatchmanInputPage() {
         });
 
         // チーフ報告内容に集合場所と時間を記載
-        const chiefReportContent = `集合場所: ${meetingPlace}\n集合時間: ${meetingTime}\n解散時間: ${finishTime}`;
+        let chiefReportContent = `集合場所: ${meetingPlace}\n集合時間: ${meetingTime}\n解散時間: ${finishTime}`;
+        if (movementNote.trim()) {
+          chiefReportContent += `\n移動: ${movementNote.trim()}`;
+        }
         await reportsApi.updateReport(reportId, {
           chief_report_content: chiefReportContent,
         });
@@ -154,6 +158,17 @@ function WatchmanInputPage() {
               value={meetingPlace}
               onChange={(e) => setMeetingPlace(e.target.value)}
               placeholder="集合場所を入力"
+              disabled={loading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>移動した場合記入してください</label>
+            <input
+              type="text"
+              value={movementNote}
+              onChange={(e) => setMovementNote(e.target.value)}
+              placeholder="移動した場合は記入してください（任意）"
               disabled={loading}
             />
           </div>
