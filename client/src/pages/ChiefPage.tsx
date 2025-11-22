@@ -254,9 +254,19 @@ function ChiefPage() {
     setSalesAssignment("");
 
     try {
+      // report_dateをYYYY-MM-DD形式に変換（ISO形式の場合も対応）
+      let reportDateStr = selectedReport.report_date;
+      if (reportDateStr.includes('T')) {
+        // ISO形式の場合、日付部分だけを抽出
+        reportDateStr = reportDateStr.split('T')[0];
+      } else if (reportDateStr.includes(' ')) {
+        // スペース区切りの場合
+        reportDateStr = reportDateStr.split(' ')[0];
+      }
+      
       // まず、sheetAssignmentsから取得を試みる
-      const jobKey = makeAssignmentKey(selectedReport.job_id, selectedReport.report_date, selectedReport.site_name);
-      const dateKey = makeDateAssignmentKey(selectedReport.report_date);
+      const jobKey = makeAssignmentKey(selectedReport.job_id, reportDateStr, selectedReport.site_name);
+      const dateKey = makeDateAssignmentKey(reportDateStr);
       
       if (sheetAssignments[jobKey]) {
         setSalesAssignment(sheetAssignments[jobKey]);
@@ -271,7 +281,7 @@ function ChiefPage() {
       }
 
       // 既に読み込まれているsheetDataからも検索を試みる
-      if (sheetData.length > 0 && sheetData[0].date === selectedReport.report_date) {
+      if (sheetData.length > 0 && sheetData[0].date === reportDateStr) {
         const normalizedTarget = normalizeSiteName(selectedReport.site_name);
         let matchBySite = sheetData.find(
           (row: SheetRowData) => normalizeSiteName(row.site_name) === normalizedTarget
@@ -305,10 +315,11 @@ function ChiefPage() {
       }
 
       // sheetAssignmentsにない場合は、直接スプレッドシートから取得
-      const response = await sheetsApi.getSheetDataByDate(selectedReport.report_date);
+      const response = await sheetsApi.getSheetDataByDate(reportDateStr);
       console.log("loadSalesAssignment - response:", response);
       console.log("loadSalesAssignment - selectedReport:", {
         report_date: selectedReport.report_date,
+        report_date_formatted: reportDateStr,
         site_name: selectedReport.site_name,
         job_id: selectedReport.job_id,
       });
