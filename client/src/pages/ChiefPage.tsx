@@ -179,18 +179,26 @@ function ChiefPage() {
   // 留守番スタッフの場合は場所がなくても表示
   const filteredSites = useMemo(() => {
     // 留守番スタッフの場合は場所がなくても表示
-    const watchmanSites = (!sheetDataLoading && sheetData.length > 0)
-      ? sheetData.filter((row) => row.site_name === "留守番スタッフ")
-      : reportsForLocation.filter((r) => r.site_name === "留守番スタッフ");
-    
-    if (watchmanSites.length > 0) {
-      const watchmanSite = watchmanSites[0];
-      return [{
-        site_name: watchmanSite.site_name || "留守番スタッフ",
-        location: watchmanSite.location || "",
-        job_id: watchmanSite.job_id,
-        staff_name: watchmanSite.staff_name || watchmanSite.site_staff_name || "",
-      }];
+    if (!sheetDataLoading && sheetData.length > 0) {
+      const watchmanSite = sheetData.find((row) => row.site_name === "留守番スタッフ");
+      if (watchmanSite) {
+        return [{
+          site_name: watchmanSite.site_name || "留守番スタッフ",
+          location: watchmanSite.location || "",
+          job_id: watchmanSite.job_id,
+          staff_name: watchmanSite.staff_name || "",
+        }];
+      }
+    } else if (!sheetDataLoading) {
+      const watchmanReport = reportsForLocation.find((r) => r.site_name === "留守番スタッフ");
+      if (watchmanReport) {
+        return [{
+          site_name: watchmanReport.site_name || "留守番スタッフ",
+          location: watchmanReport.location || "",
+          job_id: watchmanReport.job_id,
+          staff_name: watchmanReport.site_staff_name || "",
+        }];
+      }
     }
     
     if (!selectedLocation) {
