@@ -83,6 +83,8 @@ function ChiefPage() {
     setAvailableReports([]);
     // 営業担当もリセット
     setSalesAssignment("");
+    // キャッシュもクリア（場所が変わると営業担当も変わる可能性があるため）
+    setSheetAssignments({});
   }, [selectedLocation]);
 
   // 場所が選択され、フィルタリングされた現場が1つしかない場合は自動選択
@@ -127,18 +129,19 @@ function ChiefPage() {
       const response = await sheetsApi.getSheetDataByDate(dateFilter);
       if (response.success) {
         setSheetData(response.data);
-        // sheetAssignmentsも更新
+        // sheetAssignmentsも更新（場所も考慮）
         const assignmentMap: Record<string, string> = {};
         if (Array.isArray(response.data)) {
           response.data.forEach((row) => {
             if (row.date && row.staff_name) {
               const siteKey = makeAssignmentKey(row.job_id, row.date, row.site_name);
-              const dateKey = makeDateAssignmentKey(row.date);
+              const locationKey = row.location ? `location:${row.date}|${row.location}` : null;
               if (siteKey) {
                 assignmentMap[siteKey] = row.staff_name.trim();
               }
-              if (!assignmentMap[dateKey]) {
-                assignmentMap[dateKey] = row.staff_name.trim();
+              // 場所と日付の組み合わせでキャッシュ（同じ場所の最初のエントリのみ）
+              if (locationKey && !assignmentMap[locationKey]) {
+                assignmentMap[locationKey] = row.staff_name.trim();
               }
             }
           });
@@ -276,26 +279,33 @@ function ChiefPage() {
       }
       console.log("loadSalesAssignment - original date:", selectedReport.report_date, "converted:", reportDateStr);
       
-      // まず、sheetAssignmentsから取得を試みる
+      // まず、sheetAssignmentsから取得を試みる（場所も考慮）
+      const targetLocation = selectedReport.location || selectedLocation;
       const jobKey = makeAssignmentKey(selectedReport.job_id, reportDateStr, selectedReport.site_name);
-      const dateKey = makeDateAssignmentKey(reportDateStr);
+      const locationKey = targetLocation ? `location:${reportDateStr}|${targetLocation}` : null;
       
+      // jobKeyでマッチ（最優先）
       if (sheetAssignments[jobKey]) {
+        console.log("loadSalesAssignment - found in cache by jobKey:", jobKey);
         setSalesAssignment(sheetAssignments[jobKey]);
         setSalesAssignmentLoading(false);
         return;
       }
       
-      if (sheetAssignments[dateKey]) {
-        setSalesAssignment(sheetAssignments[dateKey]);
+      // locationKeyでマッチ（場所と日付でマッチ）
+      if (locationKey && sheetAssignments[locationKey]) {
+        console.log("loadSalesAssignment - found in cache by locationKey:", locationKey);
+        setSalesAssignment(sheetAssignments[locationKey]);
         setSalesAssignmentLoading(false);
         return;
       }
+      
+      // dateKeyは使わない（場所を考慮しないため、誤った結果を返す可能性がある）
 
-      // 既に読み込まれているsheetDataからも検索を試みる
+        // 既に読み込まれているsheetDataからも検索を試みる
+      const targetLocation = selectedReport.location || selectedLocation;
       if (sheetData.length > 0 && sheetData[0].date === reportDateStr) {
         const normalizedTarget = normalizeSiteName(selectedReport.site_name);
-        const targetLocation = selectedReport.location || selectedLocation;
         
         // 現場名と場所の両方でマッチ（場所が指定されている場合）
         let matchBySite = sheetData.find(
@@ -338,12 +348,12 @@ function ChiefPage() {
           const staffName = matchBySite.staff_name?.trim() || "";
           if (staffName) {
             setSalesAssignment(staffName);
-            // 次回のためにsheetAssignmentsに保存
+            // 次回のためにsheetAssignmentsに保存（場所も考慮）
             if (jobKey) {
               setSheetAssignments((prev) => ({ ...prev, [jobKey]: staffName }));
             }
-            if (dateKey) {
-              setSheetAssignments((prev) => ({ ...prev, [dateKey]: staffName }));
+            if (locationKey) {
+              setSheetAssignments((prev) => ({ ...prev, [locationKey]: staffName }));
             }
             setSalesAssignmentLoading(false);
             return;
@@ -476,12 +486,12 @@ function ChiefPage() {
         
         if (staffName) {
           setSalesAssignment(staffName);
-          // 次回のためにsheetAssignmentsに保存
+          // 次回のためにsheetAssignmentsに保存（場所も考慮）
           if (jobKey) {
             setSheetAssignments((prev) => ({ ...prev, [jobKey]: staffName }));
           }
-          if (dateKey) {
-            setSheetAssignments((prev) => ({ ...prev, [dateKey]: staffName }));
+          if (locationKey) {
+            setSheetAssignments((prev) => ({ ...prev, [locationKey]: staffName }));
           }
         } else {
           console.warn("loadSalesAssignment - staffName is empty after matching");
