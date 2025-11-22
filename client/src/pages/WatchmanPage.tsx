@@ -157,8 +157,10 @@ function WatchmanPage() {
     if (!report.chief_report_content) return null;
 
     const content = report.chief_report_content;
+    // 名前はchief_name、created_by、または報告内容から取得
+    const name = report.chief_name || report.created_by || "未入力";
     const parsed: ParsedReportContent = {
-      name: report.chief_name || "未入力",
+      name: name,
       meetingPlace: "",
       meetingTime: "",
       finishTime: "",
@@ -292,10 +294,12 @@ function WatchmanPage() {
                     <div className="reports-container">
                       {dateReports.map((report, reportIndex) => {
                         const parsed = parseReportContent(report);
+                        // 名前を取得（優先順位: chief_name > created_by > parsed?.name）
+                        const displayName = report.chief_name || report.created_by || parsed?.name || "未入力";
                         return (
                           <div key={report.id || reportIndex} className="watchman-report-card">
                             <div className="report-card-header">
-                              <h4>{parsed?.name || report.chief_name || "未入力"}</h4>
+                              <h4>{displayName}</h4>
                             </div>
                             
                             <div className="report-card-content">
