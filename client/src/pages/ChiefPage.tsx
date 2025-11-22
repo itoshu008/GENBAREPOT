@@ -90,24 +90,6 @@ function ChiefPage() {
     setIsSiteConfirmed(false);
   }, [selectedLocation]);
 
-  // 場所が選択され、フィルタリングされた現場が1つしかない場合は自動選択
-  useEffect(() => {
-    if (selectedLocation && filteredSites.length === 1 && !selectedSiteName) {
-      setSelectedSiteName(filteredSites[0].site_name);
-    }
-  }, [selectedLocation, filteredSites, selectedSiteName]);
-
-  useEffect(() => {
-    if (selectedSiteName && dateFilter) {
-      loadReportBySite();
-    } else {
-      setSelectedReport(null);
-      setAvailableReports([]);
-    }
-    // 現場名が変更されたら現場決定状態をリセット
-    setIsSiteConfirmed(false);
-  }, [selectedSiteName, dateFilter]);
-
   // スプレッドシートから日付でデータを取得
   const loadSheetData = async () => {
     setSheetDataLoading(true);
@@ -242,6 +224,24 @@ function ChiefPage() {
     
     return sites;
   }, [selectedLocation, sheetData, sheetDataLoading, reportsForLocation]);
+
+  // 場所が選択され、フィルタリングされた現場が1つしかない場合は自動選択
+  useEffect(() => {
+    if (selectedLocation && filteredSites.length === 1 && !selectedSiteName) {
+      setSelectedSiteName(filteredSites[0].site_name);
+    }
+  }, [selectedLocation, filteredSites, selectedSiteName]);
+
+  useEffect(() => {
+    if (selectedSiteName && dateFilter) {
+      loadReportBySite();
+    } else {
+      setSelectedReport(null);
+      setAvailableReports([]);
+    }
+    // 現場名が変更されたら現場決定状態をリセット
+    setIsSiteConfirmed(false);
+  }, [selectedSiteName, dateFilter]);
 
   useEffect(() => {
     if (selectedReport) {
