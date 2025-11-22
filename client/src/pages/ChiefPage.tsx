@@ -1010,15 +1010,18 @@ function ChiefPage() {
         ) : selectedReport ? (
           <div className="report-detail">
             <div className="report-detail-header">
-            <h2>報告書詳細</h2>
+              <h2>報告書詳細</h2>
               {!isSiteConfirmed && (
-                <button
-                  onClick={() => setIsSiteConfirmed(true)}
-                  className="btn btn-primary"
-                  disabled={!selectedLocation || !selectedSiteName}
-                >
-                  現場決定
-                </button>
+                <div className="site-confirm-section">
+                  <button
+                    onClick={() => setIsSiteConfirmed(true)}
+                    className="btn btn-primary"
+                    disabled={!selectedLocation || !selectedSiteName}
+                  >
+                    現場報告書確定
+                  </button>
+                  <p className="site-confirm-message">あなたの現場は選択したものであってますか？</p>
+                </div>
               )}
             </div>
 
