@@ -14,6 +14,14 @@ interface DateGroupedReport {
   salesAssignment: string;
 }
 
+interface ParsedReportContent {
+  name: string;
+  meetingPlace: string;
+  meetingTime: string;
+  finishTime: string;
+  movement?: string;
+}
+
 function WatchmanPage() {
   const navigate = useNavigate();
   const [reports, setReports] = useState<ReportWithDetails[]>([]);
@@ -22,6 +30,7 @@ function WatchmanPage() {
   const [sheetDataByDate, setSheetDataByDate] = useState<Record<string, SheetRowData[]>>({});
   const [salesAssignments, setSalesAssignments] = useState<Record<string, string>>({});
   const [loadingSalesAssignments, setLoadingSalesAssignments] = useState<Set<string>>(new Set());
+  const [submittingDates, setSubmittingDates] = useState<Set<string>>(new Set());
 
   const WATCHMAN_SITE_NAME = "留守番スタッフ";
 
@@ -143,6 +152,83 @@ function WatchmanPage() {
     return `${year}年${month}月${day}日`;
   };
 
+  // 報告内容を解析
+  const parseReportContent = (report: ReportWithDetails): ParsedReportContent | null => {
+    if (!report.chief_report_content) return null;
+
+    const content = report.chief_report_content;
+    const parsed: ParsedReportContent = {
+      name: report.chief_name || "未入力",
+      meetingPlace: "",
+      meetingTime: "",
+      finishTime: "",
+    };
+
+    // 集合場所: の行を探す
+    const meetingPlaceMatch = content.match(/集合場所:\s*(.+)/);
+    if (meetingPlaceMatch) {
+      parsed.meetingPlace = meetingPlaceMatch[1].trim();
+    }
+
+    // 集合時間: の行を探す
+    const meetingTimeMatch = content.match(/集合時間:\s*(.+)/);
+    if (meetingTimeMatch) {
+      parsed.meetingTime = meetingTimeMatch[1].trim();
+    }
+
+    // 解散時間: の行を探す
+    const finishTimeMatch = content.match(/解散時間:\s*(.+)/);
+    if (finishTimeMatch) {
+      parsed.finishTime = finishTimeMatch[1].trim();
+    }
+
+    // 移動: の行を探す
+    const movementMatch = content.match(/移動:\s*(.+)/);
+    if (movementMatch) {
+      parsed.movement = movementMatch[1].trim();
+    }
+
+    return parsed;
+  };
+
+  // 経理に提出
+  const handleSubmitToAccounting = async (date: string, dateReports: ReportWithDetails[]) => {
+    if (submittingDates.has(date)) return;
+
+    setSubmittingDates((prev) => new Set(prev).add(date));
+    setMessage(null);
+
+    try {
+      // その日のすべての報告書を経理に提出
+      const updatePromises = dateReports.map(async (report) => {
+        if (report.id) {
+          await reportsApi.updateStatus(
+            report.id,
+            "submitted_to_accounting",
+            undefined,
+            "sales"
+          );
+        }
+      });
+
+      await Promise.all(updatePromises);
+
+      setMessage({ type: "success", text: "経理へ提出しました" });
+      await loadReports();
+    } catch (error: any) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || "提出に失敗しました",
+      });
+    } finally {
+      setSubmittingDates((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(date);
+        return newSet;
+      });
+    }
+  };
+
   return (
     <div className="watchman-page">
       <div className="container">
@@ -177,80 +263,67 @@ function WatchmanPage() {
               .map((date) => {
                 const dateReports = groupedReports[date];
                 const salesAssignment = salesAssignments[date] || (loadingSalesAssignments.has(date) ? "読み込み中..." : "未登録");
-                
-                // 同じ日付の報告内容を集約
-                const allReportContents: string[] = [];
-                const allStaffEntries: Array<{ name: string; content?: string }> = [];
-                const allChiefNames = new Set<string>();
-                
-                dateReports.forEach((report) => {
-                  if (report.chief_report_content) {
-                    allReportContents.push(report.chief_report_content);
-                  }
-                  if (report.chief_name) {
-                    allChiefNames.add(report.chief_name);
-                  }
-                  if (report.staff_entries && report.staff_entries.length > 0) {
-                    report.staff_entries.forEach((entry) => {
-                      allStaffEntries.push({
-                        name: entry.staff_name,
-                        content: entry.report_content || undefined,
-                      });
-                    });
-                  }
-                });
+                const isSubmitting = submittingDates.has(date);
+                const canSubmitToAccounting = dateReports.some(
+                  (r) => r.status === "chief_submitted_to_sales" || r.status === "staff_submitted"
+                );
 
                 return (
                   <div key={date} className="date-group">
                     <div className="date-header">
                       <h3>{formatDate(date)}</h3>
-                      <div className="sales-assignment">
-                        <span className="label">営業担当：</span>
-                        <span className="value">{salesAssignment}</span>
+                      <div className="header-actions">
+                        <div className="sales-assignment">
+                          <span className="label">営業担当：</span>
+                          <span className="value">{salesAssignment}</span>
+                        </div>
+                        {canSubmitToAccounting && (
+                          <button
+                            onClick={() => handleSubmitToAccounting(date, dateReports)}
+                            disabled={isSubmitting}
+                            className="btn-submit-accounting"
+                          >
+                            {isSubmitting ? "提出中..." : "経理に提出"}
+                          </button>
+                        )}
                       </div>
                     </div>
                     
-                    <div className="report-item">
-                      {allChiefNames.size > 0 && (
-                        <div className="chief-name">
-                          チーフ・リーダー: {Array.from(allChiefNames).join(", ")}
-                        </div>
-                      )}
-                      
-                      {allStaffEntries.length > 0 && (
-                        <div className="staff-entries">
-                          <strong>スタッフ報告:</strong>
-                          <ul>
-                            {allStaffEntries.map((entry, index) => (
-                              <li key={index}>
-                                {entry.name}
-                                {entry.content && ` - ${entry.content}`}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      
-                      {allReportContents.length > 0 && (
-                        <div className="chief-report">
-                          <strong>報告内容:</strong>
-                          {allReportContents.map((content, index) => (
-                            <div key={index} className="report-content-text">
-                              {content}
+                    <div className="reports-container">
+                      {dateReports.map((report, reportIndex) => {
+                        const parsed = parseReportContent(report);
+                        return (
+                          <div key={report.id || reportIndex} className="watchman-report-card">
+                            <div className="report-card-header">
+                              <h4>{parsed?.name || report.chief_name || "未入力"}</h4>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                      
-                      <div className="report-status">
-                        ステータス: {dateReports[0]?.status === "staff_submitted" ? "チーフ確認待ち" : 
-                                     dateReports[0]?.status === "chief_submitted_to_sales" ? "営業確認待ち" :
-                                     dateReports[0]?.status === "submitted_to_accounting" ? "経理確認待ち" :
-                                     dateReports[0]?.status === "completed" ? "完了" :
-                                     dateReports[0]?.status === "returned_by_sales" ? "営業差し戻し" :
-                                     dateReports[0]?.status === "returned_by_accounting" ? "経理差し戻し" :
-                                     dateReports[0]?.status || "未確定"}
-                      </div>
+                            
+                            <div className="report-card-content">
+                              <div className="info-row">
+                                <span className="info-label">集合場所：</span>
+                                <span className="info-value">{parsed?.meetingPlace || "-"}</span>
+                              </div>
+                              
+                              <div className="info-row">
+                                <span className="info-label">集合時間：</span>
+                                <span className="info-value">{parsed?.meetingTime || report.times?.meeting_time?.substring(0, 5) || "-"}</span>
+                              </div>
+                              
+                              <div className="info-row">
+                                <span className="info-label">解散時間：</span>
+                                <span className="info-value">{parsed?.finishTime || report.times?.finish_time?.substring(0, 5) || "-"}</span>
+                              </div>
+                              
+                              {parsed?.movement && (
+                                <div className="info-row">
+                                  <span className="info-label">移動場所：</span>
+                                  <span className="info-value">{parsed.movement}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
