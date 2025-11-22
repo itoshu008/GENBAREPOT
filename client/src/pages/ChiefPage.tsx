@@ -127,6 +127,7 @@ function ChiefPage() {
   };
 
   // 報告書から場所を取得（フォールバック用）
+  // 留守番スタッフの報告書は除外
   useEffect(() => {
     const loadReportsForLocation = async () => {
       if (!dateFilter) return;
@@ -138,7 +139,11 @@ function ChiefPage() {
           status: "staff_submitted",
         });
         if (response.success) {
-          setReportsForLocation(response.data);
+          // 留守番スタッフの報告書を除外
+          const filteredReports = response.data.filter(
+            (report) => report.site_name !== "留守番スタッフ"
+          );
+          setReportsForLocation(filteredReports);
         }
       } catch (error) {
         console.warn("Error loading reports for location:", error);
@@ -149,9 +154,11 @@ function ChiefPage() {
   }, [dateFilter]);
 
   // 利用可能な場所のリストを取得（スプレッドシートから取得したデータを優先、なければ報告書から）
+  // 留守番スタッフは除外
   const sheetLocations = Array.from(
     new Set(
       sheetData
+        .filter((row) => row.site_name !== "留守番スタッフ")
         .map((row) => row.location)
         .filter((l): l is string => !!l)
     )
@@ -176,31 +183,8 @@ function ChiefPage() {
   const isLocationListLoading = sheetDataLoading && sheetLocations.length === 0 && reportsLocations.length === 0;
 
   // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータを優先、なければ報告書から、重複を除去）
-  // 留守番スタッフの場合は場所がなくても表示
+  // 留守番スタッフは除外
   const filteredSites = useMemo(() => {
-    // 留守番スタッフの場合は場所がなくても表示
-    if (!sheetDataLoading && sheetData.length > 0) {
-      const watchmanSite = sheetData.find((row) => row.site_name === "留守番スタッフ");
-      if (watchmanSite) {
-        return [{
-          site_name: watchmanSite.site_name || "留守番スタッフ",
-          location: watchmanSite.location || "",
-          job_id: watchmanSite.job_id,
-          staff_name: watchmanSite.staff_name || "",
-        }];
-      }
-    } else if (!sheetDataLoading) {
-      const watchmanReport = reportsForLocation.find((r) => r.site_name === "留守番スタッフ");
-      if (watchmanReport) {
-        return [{
-          site_name: watchmanReport.site_name || "留守番スタッフ",
-          location: watchmanReport.location || "",
-          job_id: watchmanReport.job_id,
-          staff_name: watchmanReport.site_staff_name || "",
-        }];
-      }
-    }
-    
     if (!selectedLocation) {
       return [];
     }
@@ -209,7 +193,7 @@ function ChiefPage() {
       ? Array.from(
           new Map(
             sheetData
-              .filter((row) => row.location === selectedLocation)
+              .filter((row) => row.location === selectedLocation && row.site_name !== "留守番スタッフ")
               .map((row) => [
                 row.job_id || row.site_name,
                 {
@@ -224,7 +208,7 @@ function ChiefPage() {
       : Array.from(
           new Map(
             reportsForLocation
-              .filter((r) => r.location === selectedLocation)
+              .filter((r) => r.location === selectedLocation && r.site_name !== "留守番スタッフ")
               .map((r) => [
                 r.job_id || r.site_name,
                 {
@@ -255,13 +239,6 @@ function ChiefPage() {
       setSelectedSiteName(filteredSites[0].site_name);
     }
   }, [selectedLocation, filteredSites, selectedSiteName]);
-
-  // 留守番スタッフが選択された場合、場所をクリア
-  useEffect(() => {
-    if (selectedSiteName === "留守番スタッフ") {
-      setSelectedLocation("");
-    }
-  }, [selectedSiteName]);
 
   useEffect(() => {
     if (selectedSiteName && dateFilter) {
@@ -595,10 +572,11 @@ function ChiefPage() {
   };
 
   // 現場名で報告書を取得（存在しない場合は自動的に作成）
+  // 留守番スタッフは除外
   const loadReportBySite = async () => {
-    if (!selectedSiteName || !dateFilter) return;
-    // 留守番スタッフの場合は場所がなくてもOK
-    if (selectedSiteName !== "留守番スタッフ" && !selectedLocation) return;
+    if (!selectedSiteName || !dateFilter || !selectedLocation) return;
+    // 留守番スタッフの場合は処理しない
+    if (selectedSiteName === "留守番スタッフ") return;
 
     setLoading(true);
     try {
@@ -612,27 +590,36 @@ function ChiefPage() {
       });
       
       if (response.success && response.data.length > 0) {
-        // 報告書が存在する場合
-        setAvailableReports(response.data);
-        if (response.data.length === 1) {
-          await fetchReportDetail(response.data[0].id!);
+        // 留守番スタッフの報告書を除外
+        const filteredReports = response.data.filter(
+          (report) => report.site_name !== "留守番スタッフ"
+        );
+        
+        if (filteredReports.length > 0) {
+          // 報告書が存在する場合
+          setAvailableReports(filteredReports);
+          if (filteredReports.length === 1) {
+            await fetchReportDetail(filteredReports[0].id!);
+          } else {
+            setSelectedReport(null);
+          }
         } else {
+          // 留守番スタッフ以外の報告書がない場合
+          setAvailableReports([]);
           setSelectedReport(null);
         }
       } else {
         // 報告書が存在しない場合は自動的に作成
-        const siteCode = selectedSiteName === "留守番スタッフ"
-          ? sheetData.find(row => row.site_name === selectedSiteName)?.site_code || ""
-          : sheetData.find(
-              row => row.site_name === selectedSiteName && row.location === selectedLocation
-            )?.site_code || "";
+        const siteCode = sheetData.find(
+          row => row.site_name === selectedSiteName && row.location === selectedLocation
+        )?.site_code || "";
 
         const createResponse = await reportsApi.createReport({
           report_date: dateFilter,
           site_id: null, // site_idはサーバー側で自動解決される
           site_code: siteCode,
           site_name: selectedSiteName,
-          location: selectedSiteName === "留守番スタッフ" ? null : selectedLocation,
+          location: selectedLocation,
           created_by: chiefName || "chief",
           status: "staff_draft",
         });
@@ -993,20 +980,13 @@ function ChiefPage() {
               <label>現場名</label>
               <select
                 value={selectedSiteName}
-                onChange={(e) => {
-                  const newSiteName = e.target.value;
-                  setSelectedSiteName(newSiteName);
-                  // 留守番スタッフが選択された場合、場所をクリア
-                  if (newSiteName === "留守番スタッフ") {
-                    setSelectedLocation("");
-                  }
-                }}
-                disabled={(filteredSites.length === 0 && !selectedLocation) || (sheetDataLoading && sheetData.length === 0 && reportsForLocation.length === 0 && !selectedLocation)}
+                onChange={(e) => setSelectedSiteName(e.target.value)}
+                disabled={!selectedLocation || (sheetDataLoading && sheetData.length === 0 && reportsForLocation.length === 0)}
               >
                 <option value="">
-                  {filteredSites.length === 0 && !selectedLocation
-                    ? "まず場所を選択してください（留守番スタッフは場所不要）"
-                    : (sheetDataLoading && sheetData.length === 0 && reportsForLocation.length === 0 && !selectedLocation)
+                  {!selectedLocation 
+                    ? "まず場所を選択してください"
+                    : (sheetDataLoading && sheetData.length === 0 && reportsForLocation.length === 0)
                     ? "読み込み中..."
                     : filteredSites.length === 0
                     ? "現場が見つかりません"
