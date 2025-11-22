@@ -67,6 +67,7 @@ function ChiefPage() {
   const [salesAssignmentLoading, setSalesAssignmentLoading] = useState<boolean>(false);
   const [salesAssignmentError, setSalesAssignmentError] = useState<string | null>(null);
   const [sheetAssignments, setSheetAssignments] = useState<Record<string, string>>({});
+  const [isSiteConfirmed, setIsSiteConfirmed] = useState<boolean>(false);
 
   useEffect(() => {
     loadSheetData();
@@ -85,6 +86,8 @@ function ChiefPage() {
     setSalesAssignment("");
     // キャッシュもクリア（場所が変わると営業担当も変わる可能性があるため）
     setSheetAssignments({});
+    // 現場決定状態もリセット
+    setIsSiteConfirmed(false);
   }, [selectedLocation]);
 
   // 場所が選択され、フィルタリングされた現場が1つしかない場合は自動選択
@@ -120,6 +123,8 @@ function ChiefPage() {
       setSelectedReport(null);
       setAvailableReports([]);
     }
+    // 現場名が変更されたら現場決定状態をリセット
+    setIsSiteConfirmed(false);
   }, [selectedSiteName, dateFilter]);
 
   // スプレッドシートから日付でデータを取得
@@ -879,9 +884,9 @@ function ChiefPage() {
   };
 
   if (showCompletion) {
-    return (
-      <div className="chief-page">
-        <div className="container">
+  return (
+    <div className="chief-page">
+      <div className="container">
           <SubmissionComplete
             roleLabel="チーフ・リーダー報告書"
             message="営業へ提出が完了しました。"
@@ -919,6 +924,7 @@ function ChiefPage() {
           </div>
         </div>
 
+        {!isSiteConfirmed && (
         <div className="filter-section">
           <div className="form-group">
             <label>日付</label>
@@ -929,47 +935,48 @@ function ChiefPage() {
             />
           </div>
           <div className="form-group">
-            <label>場所</label>
-            <select
-              value={selectedLocation}
-              onChange={(e) => {
-                setSelectedLocation(e.target.value);
-                setSelectedSiteName("");
-              }}
-              disabled={isLocationListLoading}
-            >
-              {isLocationListLoading ? (
-                <option value="">読み込み中...</option>
-              ) : (
-                <>
-                  <option value="">すべての場所</option>
-                  {availableLocations.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
-                  ))}
-                </>
-              )}
-            </select>
+              <label>場所</label>
+              <select
+                value={selectedLocation}
+                onChange={(e) => {
+                  setSelectedLocation(e.target.value);
+                  setSelectedSiteName("");
+                }}
+                disabled={isLocationListLoading}
+              >
+                {isLocationListLoading ? (
+                  <option value="">読み込み中...</option>
+                ) : (
+                  <>
+                    <option value="">すべての場所</option>
+                    {availableLocations.map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
           </div>
-          <div className="form-group">
-            <label>現場名</label>
-            <select
-              value={selectedSiteName}
-              onChange={(e) => setSelectedSiteName(e.target.value)}
-              disabled={!selectedLocation}
-            >
-              <option value="">
-                {selectedLocation ? "現場を選択してください" : "まず場所を選択してください"}
-              </option>
-              {filteredSites.map((site, index) => (
-                <option key={index} value={site.site_name}>
-                  {site.site_name}
+            <div className="form-group">
+              <label>現場名</label>
+              <select
+                value={selectedSiteName}
+                onChange={(e) => setSelectedSiteName(e.target.value)}
+                disabled={!selectedLocation}
+              >
+                <option value="">
+                  {selectedLocation ? "現場を選択してください" : "まず場所を選択してください"}
                 </option>
-              ))}
-            </select>
-          </div>
+                {filteredSites.map((site, index) => (
+                  <option key={index} value={site.site_name}>
+                    {site.site_name}
+                  </option>
+                ))}
+              </select>
         </div>
+          </div>
+        )}
 
           {loading ? (
             <p>読み込み中...</p>
@@ -1002,7 +1009,35 @@ function ChiefPage() {
         </div>
         ) : selectedReport ? (
           <div className="report-detail">
+            <div className="report-detail-header">
             <h2>報告書詳細</h2>
+              {!isSiteConfirmed && (
+                <button
+                  onClick={() => setIsSiteConfirmed(true)}
+                  className="btn btn-primary"
+                  disabled={!selectedLocation || !selectedSiteName}
+                >
+                  現場決定
+                </button>
+              )}
+            </div>
+
+            {isSiteConfirmed && (
+              <div className="confirmed-site-info">
+            <div className="form-group">
+                  <label>日付</label>
+                  <div className="value">{dateFilter}</div>
+                </div>
+                <div className="form-group">
+                  <label>場所</label>
+                  <div className="value">{selectedLocation || "未選択"}</div>
+                </div>
+                <div className="form-group">
+                  <label>現場名</label>
+                  <div className="value">{selectedSiteName || "未選択"}</div>
+                </div>
+              </div>
+            )}
 
             <div className="form-group">
               <label>チーフ・リーダー氏名</label>
@@ -1011,6 +1046,7 @@ function ChiefPage() {
                 value={chiefName}
                 onChange={(e) => setChiefName(e.target.value)}
                 placeholder="あなたの名前を入力"
+                disabled={!isSiteConfirmed}
               />
             </div>
 
@@ -1023,6 +1059,7 @@ function ChiefPage() {
                     type="time"
                     value={meetingTime}
                     onChange={(e) => setMeetingTime(e.target.value)}
+                    disabled={!isSiteConfirmed}
                   />
                 </div>
                 <div className="form-group">
@@ -1031,6 +1068,7 @@ function ChiefPage() {
                     type="time"
                     value={arrivalTime}
                     onChange={(e) => setArrivalTime(e.target.value)}
+                    disabled={!isSiteConfirmed}
                   />
                 </div>
                 <div className="form-group">
@@ -1039,6 +1077,7 @@ function ChiefPage() {
                     type="time"
                     value={finishTime}
                     onChange={(e) => setFinishTime(e.target.value)}
+                    disabled={!isSiteConfirmed}
                   />
                 </div>
                 <div className="form-group">
@@ -1047,10 +1086,15 @@ function ChiefPage() {
                     type="time"
                     value={departureTime}
                     onChange={(e) => setDepartureTime(e.target.value)}
+                    disabled={!isSiteConfirmed}
                   />
                 </div>
               </div>
-              <button onClick={handleUpdateTimes} className="btn btn-secondary">
+              <button 
+                onClick={handleUpdateTimes} 
+                className="btn btn-secondary"
+                disabled={!isSiteConfirmed}
+              >
                 時間を保存
               </button>
             </div>
@@ -1074,6 +1118,7 @@ function ChiefPage() {
                 onChange={(e) => setChiefReportContent(e.target.value)}
                 rows={4}
                 placeholder="チーフ・リーダーとしての報告内容を記入してください"
+                disabled={!isSiteConfirmed}
               />
             </div>
 
@@ -1085,7 +1130,7 @@ function ChiefPage() {
                   accept="image/*"
                   multiple
                   onChange={handlePhotoUpload}
-                  disabled={uploadingPhotos || photos.length >= 10}
+                  disabled={!isSiteConfirmed || uploadingPhotos || photos.length >= 10}
                   style={{ marginBottom: "10px" }}
                 />
                 {photos.length >= 10 && (
@@ -1148,32 +1193,32 @@ function ChiefPage() {
                         <tr>
                         <td>{entry.staff_name}</td>
                           <td>{formatStaffRoles(selectedReport.staff_roles)}</td>
-                          <td>
-                            <input
-                              type="checkbox"
+                        <td>
+                          <input
+                            type="checkbox"
                               checked={entry.is_driving || false}
-                              onChange={(e) =>
+                            onChange={(e) =>
                                 handleAllowanceToggle(
                                   entry,
                                   "is_driving",
                                   e.target.checked
-                                )
-                              }
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="checkbox"
+                              )
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
                               checked={entry.is_laundry || false}
-                              onChange={(e) =>
+                            onChange={(e) =>
                                 handleAllowanceToggle(
                                   entry,
                                   "is_laundry",
                                   e.target.checked
-                                )
-                              }
-                            />
-                          </td>
+                              )
+                            }
+                          />
+                        </td>
                         <td>
                           <input
                             type="checkbox"
@@ -1182,7 +1227,7 @@ function ChiefPage() {
                                 handleAllowanceToggle(
                                   entry,
                                   "is_partition",
-                                  e.target.checked
+                                e.target.checked
                               )
                             }
                           />
@@ -1221,8 +1266,8 @@ function ChiefPage() {
                             >
                               削除
                             </button>
-                          </td>
-                        </tr>
+                        </td>
+                      </tr>
                         <tr>
                           <td colSpan={8}>
                             <div className="staff-report-content">
@@ -1242,7 +1287,7 @@ function ChiefPage() {
             <div className="button-group">
               <button
                 onClick={handleSubmitToSales}
-                disabled={loading || !chiefName}
+                disabled={!isSiteConfirmed || loading || !chiefName}
                 className="btn btn-primary"
               >
                 営業へ提出
