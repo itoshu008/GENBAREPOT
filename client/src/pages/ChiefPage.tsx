@@ -318,7 +318,17 @@ function ChiefPage() {
           );
         }
         
-        // 現場名でマッチした場合のみ使用（最初のエントリは使わない）
+        // 現場名でマッチできない場合、場所だけでマッチを試みる
+        if (!matchBySite && targetLocation) {
+          matchBySite = sheetData.find(
+            (row: SheetRowData) => row.location === targetLocation
+          );
+          if (matchBySite) {
+            console.log("loadSalesAssignment - matched by location only (cached):", matchBySite);
+          }
+        }
+        
+        // 現場名でマッチした場合のみ使用
         if (matchBySite) {
           const staffName = matchBySite.staff_name?.trim() || "";
           if (staffName) {
@@ -431,12 +441,28 @@ function ChiefPage() {
           );
         }
         
-        // 現場名でマッチした場合のみ使用（最初のエントリは使わない）
+        // 現場名でマッチした場合のみ使用
         if (!matchBySite) {
-          console.warn("loadSalesAssignment - no match found for site:", selectedReport.site_name);
-          setSalesAssignment("");
-          setSalesAssignmentLoading(false);
-          return;
+          // 現場名でマッチできない場合、場所だけでマッチを試みる
+          if (targetLocation) {
+            const matchByLocation = response.data.find(
+              (row: SheetRowData) => row.location === targetLocation
+            );
+            if (matchByLocation) {
+              console.log("loadSalesAssignment - matched by location only:", matchByLocation);
+              matchBySite = matchByLocation;
+            } else {
+              console.warn("loadSalesAssignment - no match found for site:", selectedReport.site_name, "location:", targetLocation);
+              setSalesAssignment("");
+              setSalesAssignmentLoading(false);
+              return;
+            }
+          } else {
+            console.warn("loadSalesAssignment - no match found for site:", selectedReport.site_name);
+            setSalesAssignment("");
+            setSalesAssignmentLoading(false);
+            return;
+          }
         }
         
         console.log("loadSalesAssignment - matched:", matchBySite);
