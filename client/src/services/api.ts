@@ -1,9 +1,21 @@
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4100";
+// 本番環境では相対パスを使用（HTTPS対応）
+// 開発環境では環境変数またはデフォルトのlocalhostを使用
+const getApiUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // 本番環境（HTTPS）では相対パスを使用
+  if (window.location.protocol === 'https:') {
+    return ''; // 相対パス（同じドメイン経由）
+  }
+  // 開発環境ではlocalhost
+  return "http://localhost:4100";
+};
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: getApiUrl(),
   headers: {
     "Content-Type": "application/json",
   },
