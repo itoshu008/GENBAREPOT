@@ -111,7 +111,7 @@ function WatchmanInputPage() {
         <div className="container">
           <SubmissionComplete
             roleLabel="留守番スタッフ報告書"
-            message="内容はチーフ・リーダーへ共有されました。"
+            message="担当者に共有されました。"
           />
           <AvailabilityPrompt staffName={name} role="staff" />
         </div>
