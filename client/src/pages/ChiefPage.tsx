@@ -176,7 +176,23 @@ function ChiefPage() {
   const isLocationListLoading = sheetDataLoading && sheetLocations.length === 0 && reportsLocations.length === 0;
 
   // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータを優先、なければ報告書から、重複を除去）
+  // 留守番スタッフの場合は場所がなくても表示
   const filteredSites = useMemo(() => {
+    // 留守番スタッフの場合は場所がなくても表示
+    const watchmanSites = (!sheetDataLoading && sheetData.length > 0)
+      ? sheetData.filter((row) => row.site_name === "留守番スタッフ")
+      : reportsForLocation.filter((r) => r.site_name === "留守番スタッフ");
+    
+    if (watchmanSites.length > 0) {
+      const watchmanSite = watchmanSites[0];
+      return [{
+        site_name: watchmanSite.site_name || "留守番スタッフ",
+        location: watchmanSite.location || "",
+        job_id: watchmanSite.job_id,
+        staff_name: watchmanSite.staff_name || watchmanSite.site_staff_name || "",
+      }];
+    }
+    
     if (!selectedLocation) {
       return [];
     }
@@ -231,6 +247,13 @@ function ChiefPage() {
       setSelectedSiteName(filteredSites[0].site_name);
     }
   }, [selectedLocation, filteredSites, selectedSiteName]);
+
+  // 留守番スタッフが選択された場合、場所をクリア
+  useEffect(() => {
+    if (selectedSiteName === "留守番スタッフ") {
+      setSelectedLocation("");
+    }
+  }, [selectedSiteName]);
 
   useEffect(() => {
     if (selectedSiteName && dateFilter) {
@@ -565,7 +588,9 @@ function ChiefPage() {
 
   // 現場名で報告書を取得（存在しない場合は自動的に作成）
   const loadReportBySite = async () => {
-    if (!selectedSiteName || !dateFilter || !selectedLocation) return;
+    if (!selectedSiteName || !dateFilter) return;
+    // 留守番スタッフの場合は場所がなくてもOK
+    if (selectedSiteName !== "留守番スタッフ" && !selectedLocation) return;
 
     setLoading(true);
     try {
@@ -588,16 +613,18 @@ function ChiefPage() {
         }
       } else {
         // 報告書が存在しない場合は自動的に作成
-        const siteCode = sheetData.find(
-          row => row.site_name === selectedSiteName && row.location === selectedLocation
-        )?.site_code || "";
+        const siteCode = selectedSiteName === "留守番スタッフ"
+          ? sheetData.find(row => row.site_name === selectedSiteName)?.site_code || ""
+          : sheetData.find(
+              row => row.site_name === selectedSiteName && row.location === selectedLocation
+            )?.site_code || "";
 
         const createResponse = await reportsApi.createReport({
           report_date: dateFilter,
           site_id: null, // site_idはサーバー側で自動解決される
           site_code: siteCode,
           site_name: selectedSiteName,
-          location: selectedLocation,
+          location: selectedSiteName === "留守番スタッフ" ? null : selectedLocation,
           created_by: chiefName || "chief",
           status: "staff_draft",
         });
@@ -958,13 +985,20 @@ function ChiefPage() {
               <label>現場名</label>
               <select
                 value={selectedSiteName}
-                onChange={(e) => setSelectedSiteName(e.target.value)}
-                disabled={!selectedLocation || (sheetDataLoading && sheetData.length === 0 && reportsForLocation.length === 0)}
+                onChange={(e) => {
+                  const newSiteName = e.target.value;
+                  setSelectedSiteName(newSiteName);
+                  // 留守番スタッフが選択された場合、場所をクリア
+                  if (newSiteName === "留守番スタッフ") {
+                    setSelectedLocation("");
+                  }
+                }}
+                disabled={(filteredSites.length === 0 && !selectedLocation) || (sheetDataLoading && sheetData.length === 0 && reportsForLocation.length === 0 && !selectedLocation)}
               >
                 <option value="">
-                  {!selectedLocation 
-                    ? "まず場所を選択してください"
-                    : (sheetDataLoading && sheetData.length === 0 && reportsForLocation.length === 0)
+                  {filteredSites.length === 0 && !selectedLocation
+                    ? "まず場所を選択してください（留守番スタッフは場所不要）"
+                    : (sheetDataLoading && sheetData.length === 0 && reportsForLocation.length === 0 && !selectedLocation)
                     ? "読み込み中..."
                     : filteredSites.length === 0
                     ? "現場が見つかりません"
