@@ -34,9 +34,6 @@ function WatchmanPage() {
   const [salesAssignments, setSalesAssignments] = useState<Record<string, string>>({});
   const [loadingSalesAssignments, setLoadingSalesAssignments] = useState<Set<string>>(new Set());
   const [submittingDates, setSubmittingDates] = useState<Set<string>>(new Set());
-  const [staffOptions, setStaffOptions] = useState<string[]>([]);
-  const [selectedStaff, setSelectedStaff] = useState<string>("");
-  const [staffOptionsLoading, setStaffOptionsLoading] = useState<boolean>(false);
 
   const WATCHMAN_SITE_NAME = "留守番スタッフ";
 
@@ -307,36 +304,13 @@ function WatchmanPage() {
           </div>
         )}
 
-        <div className="staff-selector">
-          <label htmlFor="staff-select">営業担当者を選択：</label>
-          <select
-            id="staff-select"
-            value={selectedStaff}
-            onChange={(e) => setSelectedStaff(e.target.value)}
-            disabled={staffOptionsLoading}
-            className="staff-select"
-          >
-            <option value="">すべての担当者</option>
-            {staffOptions.map((staff) => (
-              <option key={staff} value={staff}>
-                {staff}
-              </option>
-            ))}
-          </select>
-          {staffOptionsLoading && <span className="loading-text">読み込み中...</span>}
-        </div>
-
         {loading ? (
           <p>読み込み中...</p>
         ) : Object.keys(groupedReports).length === 0 ? (
-          <p className="empty-message">
-            {selectedStaff ? `${selectedStaff}の報告書がありません` : "報告書がありません"}
-          </p>
+          <p className="empty-message">報告書がありません</p>
         ) : (
           <div className="reports-list">
-            <h2>
-              {selectedStaff ? `${selectedStaff}の報告書` : "報告書一覧"} ({Object.keys(groupedReports).length}日分)
-            </h2>
+            <h2>報告書一覧 ({Object.keys(groupedReports).length}日分)</h2>
             {Object.keys(groupedReports)
               .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
               .map((date) => {

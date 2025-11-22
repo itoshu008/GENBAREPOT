@@ -227,6 +227,7 @@ function SalesPage() {
       (report.staff_entries &&
         report.staff_entries.some((entry) => normalizeName(entry.staff_name) === target)) ||
       normalizeName(report.created_by) === target ||
+      normalizeName(report.chief_name) === target || // 留守番スタッフの報告書も含める
       normalizeName(
         sheetAssignments[makeAssignmentKey(report.job_id, report.report_date, report.site_name)]
       ) === target ||
