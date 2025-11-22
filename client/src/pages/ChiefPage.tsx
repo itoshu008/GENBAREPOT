@@ -22,6 +22,18 @@ const formatStaffRoles = (roles?: string | null) => {
     .join(" / ");
 };
 
+const normalizeSiteName = (name?: string | null) =>
+  (name || "").replace(/[\s\u3000]/g, "").toLowerCase();
+
+const makeAssignmentKey = (jobId?: string | null, date?: string | null, site?: string | null) => {
+  if (jobId) {
+    return `job:${jobId}`;
+  }
+  return `site:${date || ""}|${normalizeSiteName(site)}`;
+};
+
+const makeDateAssignmentKey = (date?: string | null) => `date:${date || ""}`;
+
 function ChiefPage() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
   const [availableReports, setAvailableReports] = useState<ReportWithDetails[]>([]);
@@ -49,6 +61,10 @@ function ChiefPage() {
   const [uploadingPhotos, setUploadingPhotos] = useState<boolean>(false);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [showCompletion, setShowCompletion] = useState<boolean>(false);
+  const [salesAssignment, setSalesAssignment] = useState<string>("");
+  const [salesAssignmentLoading, setSalesAssignmentLoading] = useState<boolean>(false);
+  const [salesAssignmentError, setSalesAssignmentError] = useState<string | null>(null);
+  const [sheetAssignments, setSheetAssignments] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadSheetData();
@@ -107,6 +123,23 @@ function ChiefPage() {
       const response = await sheetsApi.getSheetDataByDate(dateFilter);
       if (response.success) {
         setSheetData(response.data);
+        // sheetAssignmentsも更新
+        const assignmentMap: Record<string, string> = {};
+        if (Array.isArray(response.data)) {
+          response.data.forEach((row) => {
+            if (row.date && row.staff_name) {
+              const siteKey = makeAssignmentKey(row.job_id, row.date, row.site_name);
+              const dateKey = makeDateAssignmentKey(row.date);
+              if (siteKey) {
+                assignmentMap[siteKey] = row.staff_name.trim();
+              }
+              if (!assignmentMap[dateKey]) {
+                assignmentMap[dateKey] = row.staff_name.trim();
+              }
+            }
+          });
+        }
+        setSheetAssignments((prev) => ({ ...prev, ...assignmentMap }));
       } else {
         setSheetData([]);
       }
@@ -171,7 +204,15 @@ function ChiefPage() {
           (selectedLocation
             ? sheetData.filter((row) => row.location === selectedLocation)
             : sheetData
-          ).map((row) => [row.site_name, { site_name: row.site_name, location: row.location }])
+          ).map((row) => [
+            row.job_id || row.site_name,
+            {
+              site_name: row.site_name,
+              location: row.location,
+              job_id: row.job_id,
+              staff_name: row.staff_name,
+            },
+          ])
         ).values()
       )
     : Array.from(
@@ -179,7 +220,15 @@ function ChiefPage() {
           (selectedLocation
             ? reportsForLocation.filter((r) => r.location === selectedLocation)
             : reportsForLocation
-          ).map((r) => [r.site_name, { site_name: r.site_name, location: r.location || "" }])
+          ).map((r) => [
+            r.job_id || r.site_name,
+            {
+              site_name: r.site_name,
+              location: r.location || "",
+              job_id: r.job_id,
+              staff_name: r.site_staff_name,
+            },
+          ])
         ).values()
       );
 
@@ -191,8 +240,94 @@ function ChiefPage() {
       setDepartureTime(selectedReport.times?.departure_time?.substring(0, 5) || "");
       setChiefReportContent(selectedReport.chief_report_content || "");
       loadPhotos();
+      loadSalesAssignment();
     }
   }, [selectedReport]);
+  const loadSalesAssignment = async () => {
+    if (!selectedReport?.report_date) {
+      setSalesAssignment("");
+      return;
+    }
+
+    setSalesAssignmentLoading(true);
+    setSalesAssignmentError(null);
+    setSalesAssignment("");
+
+    try {
+      // まず、sheetAssignmentsから取得を試みる
+      const jobKey = makeAssignmentKey(selectedReport.job_id, selectedReport.report_date, selectedReport.site_name);
+      const dateKey = makeDateAssignmentKey(selectedReport.report_date);
+      
+      if (sheetAssignments[jobKey]) {
+        setSalesAssignment(sheetAssignments[jobKey]);
+        setSalesAssignmentLoading(false);
+        return;
+      }
+      
+      if (sheetAssignments[dateKey]) {
+        setSalesAssignment(sheetAssignments[dateKey]);
+        setSalesAssignmentLoading(false);
+        return;
+      }
+
+      // sheetAssignmentsにない場合は、直接スプレッドシートから取得
+      const response = await sheetsApi.getSheetDataByDate(selectedReport.report_date);
+      if (response.success && Array.isArray(response.data) && response.data.length > 0) {
+        const normalizedTarget = normalizeSiteName(selectedReport.site_name);
+        
+        // job_idでマッチ
+        const matchByJob =
+          selectedReport.job_id &&
+          response.data.find((row: SheetRowData) => row.job_id === selectedReport.job_id);
+        
+        // 現場名でマッチ
+        const matchBySite =
+          response.data.find(
+            (row: SheetRowData) => normalizeSiteName(row.site_name) === normalizedTarget
+          );
+        
+        // 日付でマッチ（最初のエントリ）
+        const matchByDate = response.data[0];
+        
+        const matched = matchByJob || matchBySite || matchByDate;
+        const staffName = matched?.staff_name?.trim() || "";
+        
+        if (staffName) {
+          setSalesAssignment(staffName);
+          // 次回のためにsheetAssignmentsに保存
+          if (jobKey) {
+            setSheetAssignments((prev) => ({ ...prev, [jobKey]: staffName }));
+          }
+          if (dateKey) {
+            setSheetAssignments((prev) => ({ ...prev, [dateKey]: staffName }));
+          }
+        } else {
+          setSalesAssignment("");
+        }
+      } else {
+        // スプレッドシートにデータがない場合、報告書から推測を試みる
+        const fallbackName = selectedReport.created_by || 
+          selectedReport.staff_entries?.[0]?.staff_name || "";
+        if (fallbackName) {
+          setSalesAssignment(fallbackName);
+        } else {
+          setSalesAssignment("");
+        }
+      }
+    } catch (error) {
+      console.error("Error loading sales assignment:", error);
+      setSalesAssignmentError("営業担当を取得できませんでした");
+      // エラー時も報告書から推測を試みる
+      const fallbackName = selectedReport?.created_by || 
+        selectedReport?.staff_entries?.[0]?.staff_name || "";
+      if (fallbackName) {
+        setSalesAssignment(fallbackName);
+      }
+    } finally {
+      setSalesAssignmentLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     setIsMenuOpen(false);
@@ -727,6 +862,18 @@ function ChiefPage() {
               <button onClick={handleUpdateTimes} className="btn btn-secondary">
                 時間を保存
               </button>
+            </div>
+            <div className="form-group">
+              <label>営業担当</label>
+              <div className="value">
+                {salesAssignmentLoading
+                  ? "取得中..."
+                  : salesAssignment
+                  ? salesAssignment
+                  : salesAssignmentError
+                  ? salesAssignmentError
+                  : "未登録"}
+              </div>
             </div>
 
             <div className="form-group">
