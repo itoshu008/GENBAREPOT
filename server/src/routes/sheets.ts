@@ -7,6 +7,7 @@ import {
   syncSheetDataWithCoordinates,
   getSheetDataByDate,
   getSheetStaffNames,
+  SheetRowData,
 } from "../services/sheetSync";
 
 const router = Router();
@@ -234,11 +235,26 @@ export default function sheetRoutes(io: Server) {
         return res.json({ success: true, data: [] });
       }
 
-      // 最初のアクティブなシートからデータを取得
-      const sheet = sheets[0];
-      const data = await getSheetDataByDate(sheet, date);
+      console.log(`[sheets/by-date] Fetching data for date: ${date}`);
+      console.log(`[sheets/by-date] Found ${sheets.length} active sheets`);
+      
+      const combinedData: SheetRowData[] = [];
+      for (const sheet of sheets) {
+        try {
+          console.log(`[sheets/by-date] Processing sheet id: ${sheet.id}, target_year: ${sheet.target_year}, target_month: ${sheet.target_month}`);
+          const data = await getSheetDataByDate(sheet, date);
+          console.log(`[sheets/by-date] Sheet id ${sheet.id} returned ${data.length} rows`);
+          if (data.length > 0) {
+            console.log(`[sheets/by-date] Sample data from sheet ${sheet.id}:`, data.slice(0, 3));
+          }
+          combinedData.push(...data);
+        } catch (error) {
+          console.warn("Error fetching sheet data for sheet id:", sheet.id, error);
+        }
+      }
 
-      res.json({ success: true, data });
+      console.log(`[sheets/by-date] Total combined data: ${combinedData.length} rows`);
+      res.json({ success: true, data: combinedData });
     } catch (error: any) {
       console.error("Error fetching sheet data by date:", error);
       res.status(500).json({ error: error.message });
@@ -262,9 +278,20 @@ export default function sheetRoutes(io: Server) {
         return res.json({ success: true, data: [] });
       }
 
-      const sheet = sheets[0];
-      const names = await getSheetStaffNames(sheet);
-      res.json({ success: true, data: names });
+      const uniqueNames = new Set<string>();
+      for (const sheet of sheets) {
+        try {
+          const names = await getSheetStaffNames(sheet);
+          names.forEach((name) => uniqueNames.add(name));
+        } catch (error) {
+          console.warn("Error fetching staff names for sheet id:", sheet.id, error);
+        }
+      }
+
+      res.json({
+        success: true,
+        data: Array.from(uniqueNames).sort((a, b) => a.localeCompare(b, "ja")),
+      });
     } catch (error: any) {
       console.error("Error fetching staff names from sheet:", error);
       res.status(500).json({ error: error.message || "Failed to load staff names" });
