@@ -305,24 +305,13 @@ function ChiefPage() {
           setSalesAssignment("");
         }
       } else {
-        // スプレッドシートにデータがない場合、報告書から推測を試みる
-        const fallbackName = selectedReport.created_by || 
-          selectedReport.staff_entries?.[0]?.staff_name || "";
-        if (fallbackName) {
-          setSalesAssignment(fallbackName);
-        } else {
-          setSalesAssignment("");
-        }
+        // スプレッドシートにデータがない場合は空文字列
+        setSalesAssignment("");
       }
     } catch (error) {
       console.error("Error loading sales assignment:", error);
       setSalesAssignmentError("営業担当を取得できませんでした");
-      // エラー時も報告書から推測を試みる
-      const fallbackName = selectedReport?.created_by || 
-        selectedReport?.staff_entries?.[0]?.staff_name || "";
-      if (fallbackName) {
-        setSalesAssignment(fallbackName);
-      }
+      setSalesAssignment("");
     } finally {
       setSalesAssignmentLoading(false);
     }
