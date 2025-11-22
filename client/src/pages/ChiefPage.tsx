@@ -197,6 +197,9 @@ function ChiefPage() {
     : reportsLocations)
     .sort((a, b) => a.localeCompare(b, "ja"));
 
+  // 場所リストの読み込み中かどうか
+  const isLocationListLoading = sheetDataLoading && sheetLocations.length === 0 && reportsLocations.length === 0;
+
   // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータを優先、なければ報告書から、重複を除去）
   const filteredSites = (!sheetDataLoading && sheetData.length > 0)
     ? Array.from(
@@ -769,7 +772,7 @@ function ChiefPage() {
       <div className="container">
         <BackButton />
         <div className="page-header">
-          <h1>現場報告書 - チーフ・リーダー</h1>
+        <h1>現場報告書 - チーフ・リーダー</h1>
           <div className="header-menu">
             <button
               className="btn btn-secondary"
@@ -808,13 +811,20 @@ function ChiefPage() {
                 setSelectedLocation(e.target.value);
                 setSelectedSiteName("");
               }}
+              disabled={isLocationListLoading}
             >
-              <option value="">すべての場所</option>
-              {availableLocations.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
+              {isLocationListLoading ? (
+                <option value="">読み込み中...</option>
+              ) : (
+                <>
+                  <option value="">すべての場所</option>
+                  {availableLocations.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
           <div className="form-group">
@@ -836,8 +846,8 @@ function ChiefPage() {
           </div>
         </div>
 
-        {loading ? (
-          <p>読み込み中...</p>
+          {loading ? (
+            <p>読み込み中...</p>
         ) : !selectedSiteName ? (
           <p>日付、場所、現場名を選択してください</p>
         ) : availableReports.length > 1 && !selectedReport ? (
@@ -864,7 +874,7 @@ function ChiefPage() {
                 </li>
               ))}
             </ul>
-          </div>
+        </div>
         ) : selectedReport ? (
           <div className="report-detail">
             <h2>報告書詳細</h2>
@@ -1011,7 +1021,7 @@ function ChiefPage() {
                     {selectedReport.staff_entries.map((entry) => (
                       <Fragment key={entry.id || entry.staff_name}>
                         <tr>
-                          <td>{entry.staff_name}</td>
+                        <td>{entry.staff_name}</td>
                           <td>{formatStaffRoles(selectedReport.staff_roles)}</td>
                           <td>
                             <input
@@ -1039,45 +1049,45 @@ function ChiefPage() {
                               }
                             />
                           </td>
-                          <td>
-                            <input
-                              type="checkbox"
+                        <td>
+                          <input
+                            type="checkbox"
                               checked={entry.is_partition || false}
-                              onChange={(e) =>
+                            onChange={(e) =>
                                 handleAllowanceToggle(
                                   entry,
                                   "is_partition",
                                   e.target.checked
-                                )
-                              }
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="checkbox"
+                              )
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
                               checked={entry.is_warehouse || false}
-                              onChange={(e) =>
+                            onChange={(e) =>
                                 handleAllowanceToggle(
                                   entry,
                                   "is_warehouse",
                                   e.target.checked
-                                )
-                              }
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="checkbox"
+                              )
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
                               checked={entry.is_accommodation || false}
-                              onChange={(e) =>
+                            onChange={(e) =>
                                 handleAllowanceToggle(
                                   entry,
                                   "is_accommodation",
-                                  e.target.checked
-                                )
-                              }
-                            />
-                          </td>
+                                e.target.checked
+                              )
+                            }
+                          />
+                        </td>
                           <td>
                             <button
                               className="btn btn-danger btn-small"
@@ -1094,7 +1104,7 @@ function ChiefPage() {
                               {entry.report_content || "-"}
                             </div>
                           </td>
-                        </tr>
+                      </tr>
                       </Fragment>
                     ))}
                   </tbody>
