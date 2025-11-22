@@ -6,9 +6,9 @@ const getSocketUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  // 本番環境（HTTPS）では相対パスを使用
-  if (window.location.protocol === 'https:') {
-    return ''; // 相対パス（同じドメイン経由）
+  // 本番環境（HTTPS）では/genbareport経由でアクセス
+  if (window.location.protocol === 'https:' || window.location.hostname !== 'localhost') {
+    return '/genbareport'; // Socket.IOは/genbareport/socket.io/... として接続
   }
   // 開発環境ではlocalhost
   return "http://localhost:4100";
