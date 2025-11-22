@@ -358,23 +358,40 @@ function ChiefPage() {
         console.log("loadSalesAssignment - normalizedTarget:", normalizedTarget, "targetLocation:", targetLocation);
         console.log("loadSalesAssignment - all sheet data:", response.data.map(r => ({
           site_name: r.site_name,
+          normalized_site_name: normalizeSiteName(r.site_name),
           location: r.location,
           staff_name: r.staff_name
         })));
+        console.log("loadSalesAssignment - searching for:", {
+          site_name: selectedReport.site_name,
+          normalized: normalizedTarget,
+          location: targetLocation
+        });
         
         // 現場名と場所の両方でマッチ（場所が指定されている場合）
         let matchBySite = response.data.find(
           (row: SheetRowData) => {
             const normalizedRow = normalizeSiteName(row.site_name);
             const locationMatch = !targetLocation || row.location === targetLocation;
-            return normalizedRow === normalizedTarget && locationMatch;
+            const siteMatch = normalizedRow === normalizedTarget;
+            if (siteMatch && locationMatch) {
+              console.log("loadSalesAssignment - matched by site and location:", row);
+            }
+            return siteMatch && locationMatch;
           }
         );
         
         // 完全一致がない場合、現場名のみでマッチ
         if (!matchBySite) {
           matchBySite = response.data.find(
-            (row: SheetRowData) => normalizeSiteName(row.site_name) === normalizedTarget
+            (row: SheetRowData) => {
+              const normalizedRow = normalizeSiteName(row.site_name);
+              const match = normalizedRow === normalizedTarget;
+              if (match) {
+                console.log("loadSalesAssignment - matched by site only:", row);
+              }
+              return match;
+            }
           );
         }
         
@@ -383,7 +400,36 @@ function ChiefPage() {
           matchBySite = response.data.find(
             (row: SheetRowData) => {
               const normalizedRow = normalizeSiteName(row.site_name);
-              return normalizedRow.includes(normalizedTarget) || normalizedTarget.includes(normalizedRow);
+              const partialMatch = normalizedRow.includes(normalizedTarget) || normalizedTarget.includes(normalizedRow);
+              if (partialMatch) {
+                console.log("loadSalesAssignment - matched by partial:", row);
+              }
+              return partialMatch;
+            }
+          );
+        }
+        
+        // さらに緩いマッチング：正規化後の文字列の一部が一致する場合
+        if (!matchBySite) {
+          matchBySite = response.data.find(
+            (row: SheetRowData) => {
+              const normalizedRow = normalizeSiteName(row.site_name);
+              // どちらかがもう一方の一部を含む、または共通部分が長い
+              const len1 = normalizedTarget.length;
+              const len2 = normalizedRow.length;
+              const minLen = Math.min(len1, len2);
+              if (minLen > 0) {
+                const commonLen = Math.max(
+                  normalizedTarget.split('').filter((c, i) => normalizedRow[i] === c).length,
+                  normalizedRow.split('').filter((c, i) => normalizedTarget[i] === c).length
+                );
+                const similarity = commonLen / minLen;
+                if (similarity > 0.7) { // 70%以上一致
+                  console.log("loadSalesAssignment - matched by similarity:", row, "similarity:", similarity);
+                  return true;
+                }
+              }
+              return false;
             }
           );
         }
