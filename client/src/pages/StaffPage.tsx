@@ -553,10 +553,14 @@ function StaffPage() {
     <div className="staff-page">
       <div className="container">
         <div className="page-header">
+          <button
+            onClick={() => navigate("/select")}
+            className="btn-back-small"
+            type="button"
+          >
+            ← 戻る
+          </button>
           <h1>現場報告書 - スタッフ</h1>
-        </div>
-        <div className="staff-notice-box">
-          <p>一人現場の場合はここで入力せずチーフ・リーダー専用ページから入力をお願いします。</p>
         </div>
 
         <div className="form-section">

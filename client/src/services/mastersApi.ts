@@ -2,10 +2,12 @@ import api from "./api";
 
 export interface Site {
   id?: number;
+  job_id?: string;
   year: number;
   month: number;
   site_code: string;
   site_name: string;
+  staff_name?: string;
   location?: string;
   date?: string;
   created_at?: string;

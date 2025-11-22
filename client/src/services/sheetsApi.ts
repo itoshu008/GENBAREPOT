@@ -20,6 +20,7 @@ export interface Sheet {
 }
 
 export interface SheetRowData {
+  job_id?: string;
   date: string;
   site_name: string;
   location: string | null;

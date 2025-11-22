@@ -37,7 +37,7 @@ export default function reportRoutes(io: Server) {
       } = req.query as any;
 
       let query = `
-        SELECT r.*, s.location as site_location
+        SELECT r.*, s.location as site_location, s.job_id, s.staff_name as site_staff_name
         FROM reports r
         LEFT JOIN sites s ON r.site_id = s.id
         WHERE 1=1
@@ -115,7 +115,7 @@ export default function reportRoutes(io: Server) {
 
       // メインデータ取得
       const [reports] = await pool.execute(
-        `SELECT r.*, s.location as site_location
+        `SELECT r.*, s.location as site_location, s.job_id, s.staff_name as site_staff_name
          FROM reports r
          LEFT JOIN sites s ON r.site_id = s.id
          WHERE r.id = ?`,
@@ -171,6 +171,7 @@ export default function reportRoutes(io: Server) {
         is_partition,
         is_warehouse,
         is_accommodation,
+        job_id,
       } = req.body;
 
       if (!report_date || !site_name) {
@@ -186,8 +187,21 @@ export default function reportRoutes(io: Server) {
       await connection.beginTransaction();
 
       try {
+        const jobKey = job_id || (report_date && site_name ? `${report_date}|${site_name}` : null);
+
+        let siteRow: any = null;
+        if (jobKey) {
+          const [existingSites] = await connection.execute(
+            "SELECT * FROM sites WHERE job_id = ? LIMIT 1",
+            [jobKey]
+          );
+          if (Array.isArray(existingSites) && existingSites.length > 0) {
+            siteRow = existingSites[0];
+          }
+        }
+
         // site_idがない場合は、site_nameとsite_codeからsitesテーブルを検索
-        let finalSiteId = site_id;
+        let finalSiteId = siteRow?.id || site_id;
         if (!finalSiteId && site_name) {
           const { year, month } = {
             year: new Date(report_date).getFullYear(),
@@ -206,27 +220,35 @@ export default function reportRoutes(io: Server) {
             finalSiteId = existingSites[0].id;
           } else {
             // 存在しない場合は新規作成
+            const jobId = jobKey || `${report_date}|${site_name}`;
             const [siteResult] = await connection.execute(
-              `INSERT INTO sites (year, month, site_code, site_name, location)
-               VALUES (?, ?, ?, ?, ?)
+              `INSERT INTO sites (job_id, year, month, site_code, site_name, staff_name, location, date)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                ON DUPLICATE KEY UPDATE
                  site_name = VALUES(site_name),
+                 staff_name = VALUES(staff_name),
                  location = VALUES(location),
+                 date = VALUES(date),
                  updated_at = CURRENT_TIMESTAMP`,
-              [year, month, finalSiteCode, site_name, location || null]
+              [
+                jobId,
+                year,
+                month,
+                finalSiteCode,
+                site_name,
+                created_by || staff_name || null,
+                location || null,
+                report_date,
+              ]
             ) as any;
-            
-            // insertIdが取得できない場合は、再度検索（ON DUPLICATE KEY UPDATEの場合）
-            if (siteResult.insertId && siteResult.insertId > 0) {
-              finalSiteId = siteResult.insertId;
-            } else {
+
+            finalSiteId = siteResult.insertId || finalSiteId;
+            if (!finalSiteId) {
               const [newSites] = await connection.execute(
-                `SELECT id FROM sites 
-                 WHERE year = ? AND month = ? AND site_code = ? AND site_name = ?
-                 LIMIT 1`,
-                [year, month, finalSiteCode, site_name]
+                `SELECT id FROM sites WHERE job_id = ? LIMIT 1`,
+                [jobId]
               ) as any[];
-              if (newSites.length > 0) {
+              if (Array.isArray(newSites) && newSites.length > 0) {
                 finalSiteId = newSites[0].id;
               }
             }
@@ -243,10 +265,12 @@ export default function reportRoutes(io: Server) {
         // 報告書作成
         const [result] = await connection.execute(
           `INSERT INTO reports (
+            job_id,
             report_date, site_id, site_code, site_name, location,
             staff_roles, staff_report_content, status, created_by
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'staff_draft', ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'staff_draft', ?)`,
           [
+            jobKey || null,
             report_date,
             finalSiteId,
             finalSiteCode,
@@ -311,6 +335,7 @@ export default function reportRoutes(io: Server) {
 
       // 更新可能なフィールドを抽出
       const allowedFields = [
+        "job_id",
         "site_id",
         "site_code",
         "site_name",

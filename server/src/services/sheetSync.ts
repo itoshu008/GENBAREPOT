@@ -258,31 +258,33 @@ export async function syncSheetDataWithCoordinates(sheet: Sheet): Promise<{ coun
           continue;
         }
 
-        // サイトコードを生成（現場名から、または日付+現場名のハッシュ）
-        const siteCode = `${sheet.target_year}${sheet.target_month.toString().padStart(2, "0")}_${siteNameValue.substring(0, 10)}`;
+        const jobId = `${sheet.url}|${reportDate}|${siteNameValue}|${locationValue || ""}|${
+          staffValue || ""
+        }`.substring(0, 100);
+        const siteCode = `${sheet.target_year}${sheet.target_month
+          .toString()
+          .padStart(2, "0")}_${siteNameValue.substring(0, 10)}`;
 
-        // データベースに挿入（日付も保存）
         await connection.execute(
-          `INSERT INTO sites (year, month, site_code, site_name, location, date)
-           VALUES (?, ?, ?, ?, ?, ?)
+          `INSERT INTO sites (job_id, year, month, site_code, site_name, staff_name, location, date)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE
              site_name = VALUES(site_name),
+             staff_name = VALUES(staff_name),
              location = VALUES(location),
              date = VALUES(date),
              updated_at = CURRENT_TIMESTAMP`,
-          [sheet.target_year, sheet.target_month, siteCode, siteNameValue, locationValue, reportDate]
+          [
+            jobId,
+            sheet.target_year,
+            sheet.target_month,
+            siteCode,
+            siteNameValue,
+            staffValue || null,
+            locationValue,
+            reportDate,
+          ]
         );
-
-        // スタッフマスタにも追加（存在しない場合）
-        if (staffValue) {
-          await connection.execute(
-            `INSERT INTO staffs (year, month, staff_name, role)
-             VALUES (?, ?, ?, 'staff')
-             ON DUPLICATE KEY UPDATE
-               updated_at = CURRENT_TIMESTAMP`,
-            [sheet.target_year, sheet.target_month, staffValue]
-          );
-        }
 
         count++;
       }
@@ -306,6 +308,7 @@ export async function syncSheetDataWithCoordinates(sheet: Sheet): Promise<{ coun
  * 日付でスプレッドシートからデータを取得（リアルタイム取得）
  */
 export interface SheetRowData {
+  job_id?: string;
   date: string;
   site_name: string;
   location: string | null;
@@ -423,7 +426,11 @@ export async function getSheetDataByDate(
 
     // 指定された日付と一致する行のみを返す
     if (reportDate === targetDate) {
+      const jobId = `${sheet.url}|${reportDate}|${siteNameValue}|${locationValue || ""}|${
+        staffValue || ""
+      }`.substring(0, 100);
       result.push({
+        job_id: jobId,
         date: reportDate,
         site_name: siteNameValue,
         location: locationValue,

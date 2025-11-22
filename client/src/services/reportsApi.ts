@@ -12,11 +12,14 @@ export type ReportStatus =
 
 export interface Report {
   id?: number;
+  job_id?: string;
   report_date: string;
   site_id: number;
   site_code: string;
   site_name: string;
   location?: string;
+  site_location?: string | null;
+  site_staff_name?: string | null;
   chief_name?: string;
   status: ReportStatus;
   staff_name?: string;
