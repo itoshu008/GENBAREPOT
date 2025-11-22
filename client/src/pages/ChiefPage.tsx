@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import {
   reportsApi,
   ReportWithDetails,
@@ -92,29 +92,10 @@ function ChiefPage() {
 
   // 場所が選択され、フィルタリングされた現場が1つしかない場合は自動選択
   useEffect(() => {
-    if (selectedLocation && !sheetDataLoading) {
-      const filtered = (!sheetDataLoading && sheetData.length > 0)
-        ? Array.from(
-            new Map(
-              sheetData
-                .filter((row) => row.location === selectedLocation)
-                .map((row) => [row.site_name, { site_name: row.site_name, location: row.location }])
-            ).values()
-          )
-        : Array.from(
-            new Map(
-              reportsForLocation
-                .filter((r) => r.location === selectedLocation)
-                .map((r) => [r.site_name, { site_name: r.site_name, location: r.location || "" }])
-            ).values()
-          );
-      
-      // 現場名が1つしかない場合は自動選択
-      if (filtered.length === 1 && !selectedSiteName) {
-        setSelectedSiteName(filtered[0].site_name);
-      }
+    if (selectedLocation && filteredSites.length === 1 && !selectedSiteName) {
+      setSelectedSiteName(filteredSites[0].site_name);
     }
-  }, [selectedLocation, sheetData, sheetDataLoading, reportsForLocation]);
+  }, [selectedLocation, filteredSites, selectedSiteName]);
 
   useEffect(() => {
     if (selectedSiteName && dateFilter) {
@@ -213,39 +194,54 @@ function ChiefPage() {
   const isLocationListLoading = sheetDataLoading && sheetLocations.length === 0 && reportsLocations.length === 0;
 
   // 選択された場所でフィルタリングされた現場リスト（スプレッドシートから取得したデータを優先、なければ報告書から、重複を除去）
-  const filteredSites = (!sheetDataLoading && sheetData.length > 0)
-    ? Array.from(
-        new Map(
-          (selectedLocation
-            ? sheetData.filter((row) => row.location === selectedLocation)
-            : sheetData
-          ).map((row) => [
-            row.job_id || row.site_name,
-            {
-              site_name: row.site_name,
-              location: row.location,
-              job_id: row.job_id,
-              staff_name: row.staff_name,
-            },
-          ])
-        ).values()
-      )
-    : Array.from(
-        new Map(
-          (selectedLocation
-            ? reportsForLocation.filter((r) => r.location === selectedLocation)
-            : reportsForLocation
-          ).map((r) => [
-            r.job_id || r.site_name,
-            {
-              site_name: r.site_name,
-              location: r.location || "",
-              job_id: r.job_id,
-              staff_name: r.site_staff_name,
-            },
-          ])
-        ).values()
-      );
+  const filteredSites = useMemo(() => {
+    if (!selectedLocation) {
+      return [];
+    }
+    
+    const sites = (!sheetDataLoading && sheetData.length > 0)
+      ? Array.from(
+          new Map(
+            sheetData
+              .filter((row) => row.location === selectedLocation)
+              .map((row) => [
+                row.job_id || row.site_name,
+                {
+                  site_name: row.site_name,
+                  location: row.location,
+                  job_id: row.job_id,
+                  staff_name: row.staff_name,
+                },
+              ])
+          ).values()
+        )
+      : Array.from(
+          new Map(
+            reportsForLocation
+              .filter((r) => r.location === selectedLocation)
+              .map((r) => [
+                r.job_id || r.site_name,
+                {
+                  site_name: r.site_name,
+                  location: r.location || "",
+                  job_id: r.job_id,
+                  staff_name: r.site_staff_name,
+                },
+              ])
+          ).values()
+        );
+    
+    console.log("filteredSites calculated:", {
+      selectedLocation,
+      sheetDataLoading,
+      sheetDataLength: sheetData.length,
+      reportsForLocationLength: reportsForLocation.length,
+      filteredSitesCount: sites.length,
+      sites: sites.map(s => s.site_name)
+    });
+    
+    return sites;
+  }, [selectedLocation, sheetData, sheetDataLoading, reportsForLocation]);
 
   useEffect(() => {
     if (selectedReport) {
@@ -963,10 +959,16 @@ function ChiefPage() {
               <select
                 value={selectedSiteName}
                 onChange={(e) => setSelectedSiteName(e.target.value)}
-                disabled={!selectedLocation}
+                disabled={!selectedLocation || (sheetDataLoading && sheetData.length === 0 && reportsForLocation.length === 0)}
               >
                 <option value="">
-                  {selectedLocation ? "現場を選択してください" : "まず場所を選択してください"}
+                  {!selectedLocation 
+                    ? "まず場所を選択してください"
+                    : (sheetDataLoading && sheetData.length === 0 && reportsForLocation.length === 0)
+                    ? "読み込み中..."
+                    : filteredSites.length === 0
+                    ? "現場が見つかりません"
+                    : "現場を選択してください"}
                 </option>
                 {filteredSites.map((site, index) => (
                   <option key={index} value={site.site_name}>
@@ -1010,7 +1012,7 @@ function ChiefPage() {
         ) : selectedReport ? (
           <div className="report-detail">
             <div className="report-detail-header">
-              <h2>報告書詳細</h2>
+            <h2>報告書詳細</h2>
               {!isSiteConfirmed && (
                 <div className="site-confirm-section">
                   <button
