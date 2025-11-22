@@ -56,8 +56,8 @@ export default function reportRoutes(io: Server) {
           params.push(chief_name);
         }
       } else if (role === "sales") {
-        // 営業は提出済みのみ
-        query += ` AND r.status IN ('chief_submitted_to_sales', 'returned_by_sales', 'submitted_to_accounting')`;
+        // 営業は提出済みのみ（留守番スタッフの報告書はstaff_submittedも含める）
+        query += ` AND (r.status IN ('chief_submitted_to_sales', 'returned_by_sales', 'submitted_to_accounting') OR (r.site_name = '留守番スタッフ' AND r.status = 'staff_submitted'))`;
       } else if (role === "accounting") {
         // 経理は営業から提出されたもののみ
         query += ` AND r.status IN ('submitted_to_accounting', 'returned_by_accounting')`;
