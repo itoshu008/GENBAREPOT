@@ -12,6 +12,7 @@ function WatchmanInputPage() {
   const navigate = useNavigate();
   const [name, setName] = useState<string>("");
   const [meetingPlace, setMeetingPlace] = useState<string>("");
+  const [meetingPlaceOther, setMeetingPlaceOther] = useState<string>("");
   const [movementNote, setMovementNote] = useState<string>("");
   const [meetingTime, setMeetingTime] = useState<string>("");
   const [finishTime, setFinishTime] = useState<string>("");
@@ -23,10 +24,18 @@ function WatchmanInputPage() {
   );
 
   const handleSubmit = async () => {
+    const finalMeetingPlace = meetingPlace === "その他" ? meetingPlaceOther : meetingPlace;
     if (!name || !meetingPlace || !meetingTime || !finishTime) {
       setMessage({
         type: "error",
         text: "すべての項目を入力してください",
+      });
+      return;
+    }
+    if (meetingPlace === "その他" && !meetingPlaceOther.trim()) {
+      setMessage({
+        type: "error",
+        text: "その他の集合場所を入力してください",
       });
       return;
     }
@@ -73,7 +82,8 @@ function WatchmanInputPage() {
         });
 
         // チーフ報告内容に集合場所と時間を記載
-        let chiefReportContent = `集合場所: ${meetingPlace}\n集合時間: ${meetingTime}\n解散時間: ${finishTime}`;
+        const finalMeetingPlace = meetingPlace === "その他" ? meetingPlaceOther : meetingPlace;
+        let chiefReportContent = `集合場所: ${finalMeetingPlace}\n集合時間: ${meetingTime}\n解散時間: ${finishTime}`;
         if (movementNote.trim()) {
           chiefReportContent += `\n移動: ${movementNote.trim()}`;
         }
@@ -153,13 +163,26 @@ function WatchmanInputPage() {
 
           <div className="form-group">
             <label>集合場所 <span className="required">*</span></label>
-            <input
-              type="text"
+            <select
               value={meetingPlace}
               onChange={(e) => setMeetingPlace(e.target.value)}
-              placeholder="集合場所を入力"
               disabled={loading}
-            />
+            >
+              <option value="">選択してください</option>
+              <option value="EAST">EAST</option>
+              <option value="千種駅">千種駅</option>
+              <option value="その他">その他</option>
+            </select>
+            {meetingPlace === "その他" && (
+              <input
+                type="text"
+                value={meetingPlaceOther}
+                onChange={(e) => setMeetingPlaceOther(e.target.value)}
+                placeholder="集合場所を入力"
+                disabled={loading}
+                style={{ marginTop: "10px" }}
+              />
+            )}
           </div>
 
           <div className="form-group">
@@ -196,7 +219,7 @@ function WatchmanInputPage() {
           <div className="button-group">
             <button
               onClick={handleSubmit}
-              disabled={loading || !name || !meetingPlace || !meetingTime || !finishTime}
+              disabled={loading || !name || !meetingPlace || !meetingTime || !finishTime || (meetingPlace === "その他" && !meetingPlaceOther.trim())}
               className="btn btn-primary"
             >
               {loading ? "提出中..." : "提出"}
