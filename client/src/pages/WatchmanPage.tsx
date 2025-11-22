@@ -176,7 +176,8 @@ function WatchmanPage() {
                       <ul>
                         {report.staff_entries.map((entry, index) => (
                           <li key={index}>
-                            {entry.staff_name} - {entry.staff_roles || "-"}
+                            {entry.staff_name}
+                            {entry.report_content && ` - ${entry.report_content}`}
                           </li>
                         ))}
                       </ul>
@@ -190,8 +191,11 @@ function WatchmanPage() {
                   )}
                   <div className="report-status">
                     ステータス: {report.status === "staff_submitted" ? "チーフ確認待ち" : 
-                                 report.status === "chief_submitted" ? "営業確認待ち" :
-                                 report.status === "sales_confirmed" ? "営業確認済み" :
+                                 report.status === "chief_submitted_to_sales" ? "営業確認待ち" :
+                                 report.status === "submitted_to_accounting" ? "経理確認待ち" :
+                                 report.status === "completed" ? "完了" :
+                                 report.status === "returned_by_sales" ? "営業差し戻し" :
+                                 report.status === "returned_by_accounting" ? "経理差し戻し" :
                                  report.status || "未確定"}
                   </div>
                 </li>
