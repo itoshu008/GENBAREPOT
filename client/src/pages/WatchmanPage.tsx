@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { reportsApi, ReportWithDetails } from "../services/reportsApi";
 import { sheetsApi, SheetRowData } from "../services/sheetsApi";
@@ -8,14 +8,20 @@ const normalizeSiteName = (name?: string | null) => {
   return (name || "").replace(/[\s\u3000]/g, "").toLowerCase();
 };
 
+interface DateGroupedReport {
+  date: string;
+  reports: ReportWithDetails[];
+  salesAssignment: string;
+}
+
 function WatchmanPage() {
   const navigate = useNavigate();
   const [reports, setReports] = useState<ReportWithDetails[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
-  const [salesAssignment, setSalesAssignment] = useState<string>("");
-  const [salesAssignmentLoading, setSalesAssignmentLoading] = useState<boolean>(false);
-  const [sheetData, setSheetData] = useState<SheetRowData[]>([]);
+  const [sheetDataByDate, setSheetDataByDate] = useState<Record<string, SheetRowData[]>>({});
+  const [salesAssignments, setSalesAssignments] = useState<Record<string, string>>({});
+  const [loadingSalesAssignments, setLoadingSalesAssignments] = useState<Set<string>>(new Set());
 
   const WATCHMAN_SITE_NAME = "留守番スタッフ";
 
@@ -23,11 +29,44 @@ function WatchmanPage() {
     loadReports();
   }, []);
 
-  useEffect(() => {
-    if (reports.length > 0) {
-      loadSalesAssignment();
-    }
+  // 報告書を日付ごとにグループ化
+  const groupedReports = useMemo(() => {
+    const groups: Record<string, ReportWithDetails[]> = {};
+    
+    reports.forEach((report) => {
+      const dateStr = normalizeDate(report.report_date);
+      if (!groups[dateStr]) {
+        groups[dateStr] = [];
+      }
+      groups[dateStr].push(report);
+    });
+
+    return groups;
   }, [reports]);
+
+  // 日付ごとの営業担当を読み込む
+  useEffect(() => {
+    const dates = Object.keys(groupedReports);
+    dates.forEach((date) => {
+      if (!salesAssignments[date] && !loadingSalesAssignments.has(date)) {
+        loadSalesAssignmentForDate(date);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupedReports]);
+
+  const normalizeDate = (dateString: string): string => {
+    if (dateString.includes('T') || dateString.includes('Z')) {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } else if (dateString.includes(' ')) {
+      return dateString.split(' ')[0];
+    }
+    return dateString;
+  };
 
   const loadReports = async () => {
     setLoading(true);
@@ -59,37 +98,16 @@ function WatchmanPage() {
     }
   };
 
-  const loadSalesAssignment = async () => {
-    if (reports.length === 0) {
-      setSalesAssignment("");
-      return;
-    }
+  const loadSalesAssignmentForDate = async (date: string) => {
+    if (loadingSalesAssignments.has(date)) return;
 
-    setSalesAssignmentLoading(true);
+    setLoadingSalesAssignments((prev) => new Set(prev).add(date));
+
     try {
-      // 最新の報告書の日付を使用
-      const latestReport = reports[0];
-      if (!latestReport?.report_date) {
-        setSalesAssignment("");
-        return;
-      }
-
-      // 日付をYYYY-MM-DD形式に変換
-      let reportDateStr = latestReport.report_date;
-      if (reportDateStr.includes('T') || reportDateStr.includes('Z')) {
-        const date = new Date(reportDateStr);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        reportDateStr = `${year}-${month}-${day}`;
-      } else if (reportDateStr.includes(' ')) {
-        reportDateStr = reportDateStr.split(' ')[0];
-      }
-
       // スプレッドシートからデータを取得
-      const response = await sheetsApi.getSheetDataByDate(reportDateStr);
+      const response = await sheetsApi.getSheetDataByDate(date);
       if (response.success && Array.isArray(response.data)) {
-        setSheetData(response.data);
+        setSheetDataByDate((prev) => ({ ...prev, [date]: response.data }));
         
         // 「留守番スタッフ」の現場名でマッチ
         const normalizedTarget = normalizeSiteName(WATCHMAN_SITE_NAME);
@@ -98,18 +116,22 @@ function WatchmanPage() {
         );
 
         if (match && match.staff_name) {
-          setSalesAssignment(match.staff_name.trim());
+          setSalesAssignments((prev) => ({ ...prev, [date]: match.staff_name.trim() }));
         } else {
-          setSalesAssignment("未登録");
+          setSalesAssignments((prev) => ({ ...prev, [date]: "未登録" }));
         }
       } else {
-        setSalesAssignment("未登録");
+        setSalesAssignments((prev) => ({ ...prev, [date]: "未登録" }));
       }
     } catch (error) {
       console.error("Error loading sales assignment:", error);
-      setSalesAssignment("未登録");
+      setSalesAssignments((prev) => ({ ...prev, [date]: "未登録" }));
     } finally {
-      setSalesAssignmentLoading(false);
+      setLoadingSalesAssignments((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(date);
+        return newSet;
+      });
     }
   };
 
@@ -134,14 +156,6 @@ function WatchmanPage() {
           </button>
           <div className="header-content">
             <h1>留守番スタッフ</h1>
-            <div className="sales-assignment">
-              <span className="label">営業担当：</span>
-              {salesAssignmentLoading ? (
-                <span className="loading">読み込み中...</span>
-              ) : (
-                <span className="value">{salesAssignment || "未登録"}</span>
-              )}
-            </div>
           </div>
         </div>
 
@@ -153,54 +167,94 @@ function WatchmanPage() {
 
         {loading ? (
           <p>読み込み中...</p>
-        ) : reports.length === 0 ? (
+        ) : Object.keys(groupedReports).length === 0 ? (
           <p className="empty-message">報告書がありません</p>
         ) : (
           <div className="reports-list">
-            <h2>報告書一覧 ({reports.length}件)</h2>
-            <ul>
-              {reports.map((report) => (
-                <li key={report.id} className="report-item">
-                  <div className="report-header">
-                    <strong>{formatDate(report.report_date)}</strong>
-                    {report.location && (
-                      <span className="location">場所: {report.location}</span>
-                    )}
-                  </div>
-                  {report.chief_name && (
-                    <div className="chief-name">チーフ・リーダー: {report.chief_name}</div>
-                  )}
-                  {report.staff_entries && report.staff_entries.length > 0 && (
-                    <div className="staff-entries">
-                      <strong>スタッフ報告:</strong>
-                      <ul>
-                        {report.staff_entries.map((entry, index) => (
-                          <li key={index}>
-                            {entry.staff_name}
-                            {entry.report_content && ` - ${entry.report_content}`}
-                          </li>
-                        ))}
-                      </ul>
+            <h2>報告書一覧 ({Object.keys(groupedReports).length}日分)</h2>
+            {Object.keys(groupedReports)
+              .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+              .map((date) => {
+                const dateReports = groupedReports[date];
+                const salesAssignment = salesAssignments[date] || (loadingSalesAssignments.has(date) ? "読み込み中..." : "未登録");
+                
+                // 同じ日付の報告内容を集約
+                const allReportContents: string[] = [];
+                const allStaffEntries: Array<{ name: string; content?: string }> = [];
+                const allChiefNames = new Set<string>();
+                
+                dateReports.forEach((report) => {
+                  if (report.chief_report_content) {
+                    allReportContents.push(report.chief_report_content);
+                  }
+                  if (report.chief_name) {
+                    allChiefNames.add(report.chief_name);
+                  }
+                  if (report.staff_entries && report.staff_entries.length > 0) {
+                    report.staff_entries.forEach((entry) => {
+                      allStaffEntries.push({
+                        name: entry.staff_name,
+                        content: entry.report_content || undefined,
+                      });
+                    });
+                  }
+                });
+
+                return (
+                  <div key={date} className="date-group">
+                    <div className="date-header">
+                      <h3>{formatDate(date)}</h3>
+                      <div className="sales-assignment">
+                        <span className="label">営業担当：</span>
+                        <span className="value">{salesAssignment}</span>
+                      </div>
                     </div>
-                  )}
-                  {report.chief_report_content && (
-                    <div className="chief-report">
-                      <strong>報告内容:</strong>
-                      <div className="report-content-text">{report.chief_report_content}</div>
+                    
+                    <div className="report-item">
+                      {allChiefNames.size > 0 && (
+                        <div className="chief-name">
+                          チーフ・リーダー: {Array.from(allChiefNames).join(", ")}
+                        </div>
+                      )}
+                      
+                      {allStaffEntries.length > 0 && (
+                        <div className="staff-entries">
+                          <strong>スタッフ報告:</strong>
+                          <ul>
+                            {allStaffEntries.map((entry, index) => (
+                              <li key={index}>
+                                {entry.name}
+                                {entry.content && ` - ${entry.content}`}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {allReportContents.length > 0 && (
+                        <div className="chief-report">
+                          <strong>報告内容:</strong>
+                          {allReportContents.map((content, index) => (
+                            <div key={index} className="report-content-text">
+                              {content}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <div className="report-status">
+                        ステータス: {dateReports[0]?.status === "staff_submitted" ? "チーフ確認待ち" : 
+                                     dateReports[0]?.status === "chief_submitted_to_sales" ? "営業確認待ち" :
+                                     dateReports[0]?.status === "submitted_to_accounting" ? "経理確認待ち" :
+                                     dateReports[0]?.status === "completed" ? "完了" :
+                                     dateReports[0]?.status === "returned_by_sales" ? "営業差し戻し" :
+                                     dateReports[0]?.status === "returned_by_accounting" ? "経理差し戻し" :
+                                     dateReports[0]?.status || "未確定"}
+                      </div>
                     </div>
-                  )}
-                  <div className="report-status">
-                    ステータス: {report.status === "staff_submitted" ? "チーフ確認待ち" : 
-                                 report.status === "chief_submitted_to_sales" ? "営業確認待ち" :
-                                 report.status === "submitted_to_accounting" ? "経理確認待ち" :
-                                 report.status === "completed" ? "完了" :
-                                 report.status === "returned_by_sales" ? "営業差し戻し" :
-                                 report.status === "returned_by_accounting" ? "経理差し戻し" :
-                                 report.status || "未確定"}
                   </div>
-                </li>
-              ))}
-            </ul>
+                );
+              })}
           </div>
         )}
       </div>

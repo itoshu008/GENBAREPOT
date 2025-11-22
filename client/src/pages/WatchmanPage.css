@@ -213,3 +213,52 @@
   color: #666;
 }
 
+.date-group {
+  margin-bottom: 30px;
+  padding: 20px;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+}
+
+.date-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #667eea;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.date-header h3 {
+  margin: 0;
+  font-size: 22px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.date-header .sales-assignment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.date-header .sales-assignment .label {
+  font-weight: 600;
+  color: #666;
+}
+
+.date-header .sales-assignment .value {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.date-group .report-item {
+  margin-bottom: 0;
+  border: 1px solid #ddd;
+  background-color: white;
+}
+
