@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import MasterPage from "./pages/MasterPage";
 import StaffPage from "./pages/StaffPage";
 import ChiefPage from "./pages/ChiefPage";
@@ -11,7 +11,7 @@ import SelectPage from "./pages/SelectPage";
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<SelectPage />} />
+      <Route path="/" element={<Navigate to="/select" replace />} />
       <Route path="/select" element={<SelectPage />} />
       <Route path="/staff" element={<StaffPage />} />
       <Route path="/chief" element={<ChiefPage />} />

@@ -128,8 +128,33 @@
   background: #ffa500;
 }
 
-/* レスポンシブ対応 */
-@media (max-width: 640px) {
+.desktop-message {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.desktop-message h2 {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.desktop-message p {
+  font-size: 16px;
+  color: #666;
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+/* デスクトップ表示を非表示（スマホ専用） */
+@media (min-width: 769px) {
+  .select-page:not(:has(.desktop-message)) {
+    display: none;
+  }
+}
+
+/* レスポンシブ対応（スマホ用） */
+@media (max-width: 768px) {
   .select-container {
     padding: 24px;
   }
