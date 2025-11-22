@@ -96,6 +96,45 @@
   border: 1px solid #f5c6cb;
 }
 
+.staff-selector {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.staff-selector label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.staff-select {
+  width: 100%;
+  max-width: 300px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.staff-select:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
+}
+
+.loading-text {
+  margin-left: 10px;
+  color: #666;
+  font-size: 14px;
+  font-style: italic;
+}
+
 .empty-message {
   text-align: center;
   color: #999;

@@ -22,6 +22,9 @@ interface ParsedReportContent {
   movement?: string;
 }
 
+const normalizeName = (name?: string | null) =>
+  (name || "").replace(/[\s\u3000]/g, "").toLowerCase();
+
 function WatchmanPage() {
   const navigate = useNavigate();
   const [reports, setReports] = useState<ReportWithDetails[]>([]);
@@ -31,6 +34,9 @@ function WatchmanPage() {
   const [salesAssignments, setSalesAssignments] = useState<Record<string, string>>({});
   const [loadingSalesAssignments, setLoadingSalesAssignments] = useState<Set<string>>(new Set());
   const [submittingDates, setSubmittingDates] = useState<Set<string>>(new Set());
+  const [staffOptions, setStaffOptions] = useState<string[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<string>("");
+  const [staffOptionsLoading, setStaffOptionsLoading] = useState<boolean>(false);
 
   const WATCHMAN_SITE_NAME = "留守番スタッフ";
 
@@ -49,22 +55,70 @@ function WatchmanPage() {
 
   useEffect(() => {
     loadReports();
+    loadStaffOptions();
   }, []);
 
-  // 報告書を日付ごとにグループ化
+  // 営業担当者リストを読み込む
+  const loadStaffOptions = async () => {
+    setStaffOptionsLoading(true);
+    try {
+      const response = await sheetsApi.getStaffNames();
+      if (response.success && Array.isArray(response.data) && response.data.length > 0) {
+        const unique = new Map<string, string>();
+        response.data.forEach((name) => {
+          if (typeof name === "string") {
+            const cleaned = name.trim();
+            const normalized = normalizeName(cleaned);
+            if (normalized && !unique.has(normalized)) {
+              unique.set(normalized, cleaned);
+            }
+          }
+        });
+        setStaffOptions(Array.from(unique.values()).sort((a, b) => a.localeCompare(b, "ja")));
+      }
+    } catch (error) {
+      console.error("Error loading staff options:", error);
+    } finally {
+      setStaffOptionsLoading(false);
+    }
+  };
+
+
+  // 報告書が選択された担当者に関連しているかチェック
+  const reportHasStaff = useMemo(() => {
+    return (date: string, staff: string): boolean => {
+      if (!staff) return true; // 担当者が選択されていない場合はすべて表示
+      
+      const target = normalizeName(staff);
+      if (!target) return true;
+
+      // スプレッドシートの担当者割り当てを確認
+      const salesAssignment = salesAssignments[date];
+      if (salesAssignment && normalizeName(salesAssignment) === target) {
+        return true;
+      }
+
+      return false;
+    };
+  }, [salesAssignments]);
+
+  // 報告書を日付ごとにグループ化（選択された担当者でフィルタリング）
   const groupedReports = useMemo(() => {
     const groups: Record<string, ReportWithDetails[]> = {};
     
     reports.forEach((report) => {
       const dateStr = normalizeDate(report.report_date);
-      if (!groups[dateStr]) {
-        groups[dateStr] = [];
+      // 担当者が選択されている場合、その担当者に関連する報告書のみを表示
+      if (!selectedStaff || reportHasStaff(dateStr, selectedStaff)) {
+        if (!groups[dateStr]) {
+          groups[dateStr] = [];
+        }
+        groups[dateStr].push(report);
       }
-      groups[dateStr].push(report);
     });
 
     return groups;
-  }, [reports]);
+  }, [reports, selectedStaff, reportHasStaff]);
 
   // 日付ごとの営業担当を読み込む
   useEffect(() => {
@@ -253,13 +307,36 @@ function WatchmanPage() {
           </div>
         )}
 
+        <div className="staff-selector">
+          <label htmlFor="staff-select">営業担当者を選択：</label>
+          <select
+            id="staff-select"
+            value={selectedStaff}
+            onChange={(e) => setSelectedStaff(e.target.value)}
+            disabled={staffOptionsLoading}
+            className="staff-select"
+          >
+            <option value="">すべての担当者</option>
+            {staffOptions.map((staff) => (
+              <option key={staff} value={staff}>
+                {staff}
+              </option>
+            ))}
+          </select>
+          {staffOptionsLoading && <span className="loading-text">読み込み中...</span>}
+        </div>
+
         {loading ? (
           <p>読み込み中...</p>
         ) : Object.keys(groupedReports).length === 0 ? (
-          <p className="empty-message">報告書がありません</p>
+          <p className="empty-message">
+            {selectedStaff ? `${selectedStaff}の報告書がありません` : "報告書がありません"}
+          </p>
         ) : (
           <div className="reports-list">
-            <h2>報告書一覧 ({Object.keys(groupedReports).length}日分)</h2>
+            <h2>
+              {selectedStaff ? `${selectedStaff}の報告書` : "報告書一覧"} ({Object.keys(groupedReports).length}日分)
+            </h2>
             {Object.keys(groupedReports)
               .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
               .map((date) => {
