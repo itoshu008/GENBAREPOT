@@ -6,11 +6,13 @@ import SalesPage from "./pages/SalesPage";
 import AccountingPage from "./pages/AccountingPage";
 import ReportManagementPage from "./pages/ReportManagementPage";
 import AvailabilityAdminPage from "./pages/AvailabilityAdminPage";
+import SelectPage from "./pages/SelectPage";
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<StaffPage />} />
+      <Route path="/" element={<SelectPage />} />
+      <Route path="/select" element={<SelectPage />} />
       <Route path="/staff" element={<StaffPage />} />
       <Route path="/chief" element={<ChiefPage />} />
       <Route path="/sales" element={<SalesPage />} />
