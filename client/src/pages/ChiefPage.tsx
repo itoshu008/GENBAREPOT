@@ -261,15 +261,20 @@ function ChiefPage() {
     setSalesAssignment("");
 
     try {
-      // report_dateをYYYY-MM-DD形式に変換（ISO形式の場合も対応）
+      // report_dateをYYYY-MM-DD形式に変換（タイムゾーンを考慮）
       let reportDateStr = selectedReport.report_date;
-      if (reportDateStr.includes('T')) {
-        // ISO形式の場合、日付部分だけを抽出
-        reportDateStr = reportDateStr.split('T')[0];
+      if (reportDateStr.includes('T') || reportDateStr.includes('Z')) {
+        // ISO形式の場合、日本時間（JST）に変換してから日付部分を抽出
+        const date = new Date(reportDateStr);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        reportDateStr = `${year}-${month}-${day}`;
       } else if (reportDateStr.includes(' ')) {
         // スペース区切りの場合
         reportDateStr = reportDateStr.split(' ')[0];
       }
+      console.log("loadSalesAssignment - original date:", selectedReport.report_date, "converted:", reportDateStr);
       
       // まず、sheetAssignmentsから取得を試みる
       const jobKey = makeAssignmentKey(selectedReport.job_id, reportDateStr, selectedReport.site_name);
