@@ -6,8 +6,12 @@ const getSocketUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  // 本番環境（HTTPS）では/genbareport経由でアクセス
-  if (window.location.protocol === 'https:' || window.location.hostname !== 'localhost') {
+  // 本番環境判定: HTTPSまたはlocalhost以外のホスト名
+  const isProduction = window.location.protocol === 'https:' || 
+                       (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
+  
+  if (isProduction) {
+    // 本番環境では/genbareport経由でアクセス（HTTPS対応）
     return '/genbareport'; // Socket.IOは/genbareport/socket.io/... として接続
   }
   // 開発環境ではlocalhost

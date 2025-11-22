@@ -6,13 +6,22 @@ const getApiUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  // 本番環境（HTTPS）では/genbareport/api経由でアクセス
-  if (window.location.protocol === 'https:' || window.location.hostname !== 'localhost') {
+  // 本番環境判定: HTTPSまたはlocalhost以外のホスト名
+  const isProduction = window.location.protocol === 'https:' || 
+                       (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
+  
+  if (isProduction) {
+    // 本番環境では/genbareport経由でアクセス（HTTPS対応）
     return '/genbareport'; // /genbareport/api/... として呼び出される
   }
   // 開発環境ではlocalhost
   return "http://localhost:4100";
 };
+
+// デバッグ用（本番環境では削除可能）
+if (import.meta.env.DEV) {
+  console.log('API Base URL:', getApiUrl());
+}
 
 const api = axios.create({
   baseURL: getApiUrl(),
