@@ -7,8 +7,15 @@ import "./SalesPage.css";
 
 const normalizeName = (name?: string | null) =>
   (name || "").replace(/[\s\u3000]/g, "").toLowerCase();
-const makeAssignmentKey = (date?: string | null, site?: string | null) =>
-  `${date || ""}|${(site || "").trim()}`;
+const normalizeSiteName = (name?: string | null) =>
+  (name || "").replace(/[\s\u3000]/g, "").toLowerCase();
+const makeAssignmentKey = (jobId?: string | null, date?: string | null, site?: string | null) => {
+  if (jobId) {
+    return `job:${jobId}`;
+  }
+  return `site:${date || ""}|${normalizeSiteName(site)}`;
+};
+const makeDateAssignmentKey = (date?: string | null) => `date:${date || ""}`;
 
 function SalesPage() {
   const [reports, setReports] = useState<ReportWithDetails[]>([]);
@@ -64,7 +71,7 @@ function SalesPage() {
 
   useEffect(() => {
     loadReports();
-    loadStaffOptions();
+    loadStaffOptions([]);
   }, []);
 
   useEffect(() => {
@@ -118,13 +125,11 @@ function SalesPage() {
       if (response.success) {
         const data = response.data;
         setReports(data);
-        if (staffOptions.length === 0) {
-          const fallback = deriveStaffOptions(data);
-          if (fallback.length > 0) {
-            setStaffOptions(fallback);
-          }
-        }
         await loadSheetAssignments(data);
+        // スタッフオプションが空の場合は、報告書から取得
+        if (staffOptions.length === 0) {
+          await loadStaffOptions(data);
+        }
       }
     } catch (error) {
       console.error("Error loading reports:", error);
@@ -133,7 +138,7 @@ function SalesPage() {
     }
   };
 
-  const loadStaffOptions = async () => {
+  const loadStaffOptions = async (reportList: ReportWithDetails[] = []) => {
     setStaffOptionsLoading(true);
     setStaffOptionsError(null);
     try {
@@ -151,14 +156,18 @@ function SalesPage() {
         });
         setStaffOptions(Array.from(unique.values()).sort((a, b) => a.localeCompare(b, "ja")));
       } else {
-        const fallback = deriveStaffOptions(reports);
-        setStaffOptions(fallback);
+        const fallback = deriveStaffOptions(reportList);
+        if (fallback.length > 0) {
+          setStaffOptions(fallback);
+        }
       }
     } catch (error) {
       console.error("Error loading staff names:", error);
       setStaffOptionsError("担当者リストを取得できませんでした");
-      const fallback = deriveStaffOptions(reports);
-      setStaffOptions(fallback);
+      const fallback = deriveStaffOptions(reportList);
+      if (fallback.length > 0) {
+        setStaffOptions(fallback);
+      }
     } finally {
       setStaffOptionsLoading(false);
     }
@@ -180,10 +189,14 @@ function SalesPage() {
         const response = await sheetsApi.getSheetDataByDate(date);
         if (response.success && Array.isArray(response.data)) {
           response.data.forEach((row) => {
-            if (row.date && row.site_name && row.staff_name) {
-              const key = makeAssignmentKey(row.date, row.site_name);
-              if (key) {
-                assignmentMap[key] = row.staff_name.trim();
+            if (row.date && row.staff_name) {
+              const siteKey = makeAssignmentKey(row.job_id, row.date, row.site_name);
+              const dateKey = makeDateAssignmentKey(row.date);
+              if (siteKey) {
+                assignmentMap[siteKey] = row.staff_name.trim();
+              }
+              if (!assignmentMap[dateKey]) {
+                assignmentMap[dateKey] = row.staff_name.trim();
               }
             }
           });
@@ -215,21 +228,22 @@ function SalesPage() {
         report.staff_entries.some((entry) => normalizeName(entry.staff_name) === target)) ||
       normalizeName(report.created_by) === target ||
       normalizeName(
-        sheetAssignments[makeAssignmentKey(report.report_date, report.site_name)]
-      ) === target
+        sheetAssignments[makeAssignmentKey(report.job_id, report.report_date, report.site_name)]
+      ) === target ||
+      normalizeName(sheetAssignments[makeDateAssignmentKey(report.report_date)]) === target
     );
   };
 
   const filteredReports = useMemo(() => {
     if (!selectedStaff) return [];
     return reports.filter((report) => reportHasStaff(report, selectedStaff));
-  }, [reports, selectedStaff]);
+  }, [reports, selectedStaff, sheetAssignments]);
 
   useEffect(() => {
     if (selectedReport && selectedStaff && !reportHasStaff(selectedReport, selectedStaff)) {
       setSelectedReport(null);
     }
-  }, [selectedStaff, selectedReport]);
+  }, [selectedStaff, selectedReport, sheetAssignments]);
 
   useEffect(() => {
     if (selectedStaff && staffOptions.length > 0 && !staffOptions.includes(selectedStaff)) {
